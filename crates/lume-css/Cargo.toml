@@ -1,0 +1,8 @@
+[package]
+name = "lume-css"
+description = "Parser for the CSS subset used by lume themes"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]

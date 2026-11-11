@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  English texts. This is the reference language and the fallback for every missing translation.
+  Translations go in values-<qualifier>/strings.xml, for example values-pt-rBR or values-es.
+  Use positional placeholders (%1$s for text, %1$d for numbers) so each language can reorder words.
+-->
+<resources>
+    <string name="app_name">HOME</string>
+    <string name="tagline">your home on TV</string>
+
+    <!-- Top bar -->
+    <string name="tab_home">Home</string>
+    <string name="tab_apps">Apps</string>
+
+    <!-- Home screen -->
+    <string name="home_favorites_title">Your favorite apps</string>
+    <string name="home_add_favorites">Add favorites</string>
+
+    <!-- Apps screen -->
+    <string name="apps_title">All apps</string>
+
+    <!-- HOME settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_home_screen">Home screen</string>
+    <string name="settings_key_mapping">Remote control</string>
+    <string name="settings_tv_info">TV information</string>
+    <string name="settings_about">About HOME</string>
+
+    <!-- TV status panel -->
+    <string name="stats_title">TV STATUS</string>
+    <string name="stats_memory">Memory</string>
+    <string name="stats_disk">Storage</string>
+    <string name="stats_cpu">CPU clock</string>
+
+    <!-- TV information -->
+    <string name="tv_info_title">TV information</string>
+    <string name="tv_section_device">DEVICE</string>
+    <string name="tv_section_processing">PROCESSING &amp; GRAPHICS</string>
+    <string name="tv_section_memory">MEMORY &amp; STORAGE</string>
+    <string name="tv_section_system">SYSTEM &amp; FIRMWARE</string>
+    <string name="tv_section_display">DISPLAY</string>
+    <string name="tv_section_network">NETWORK</string>
+    <string name="tv_brand">Brand</string>
+    <string name="tv_model">Model</string>
+    <string name="tv_manufacturer">Manufacturer</string>
+    <string name="tv_board">Board</string>
+    <string name="tv_soc">Processor (SoC)</string>
+    <string name="tv_cpu">CPU</string>
+    <string name="tv_cores">Cores</string>
+    <string name="tv_abi">Architecture (ABI)</string>
+    <string name="tv_gpu">GPU</string>
+    <string name="tv_opengl">OpenGL ES</string>
+    <string name="tv_ram">Memory (RAM)</string>
+    <string name="tv_memory_profile">Memory profile</string>
+    <string name="tv_storage_total">Internal storage</string>
+    <string name="tv_storage_free">Free storage</string>
+    <string name="tv_android">Android version</string>
+    <string name="tv_api">API level</string>
+    <string name="tv_firmware">TV firmware</string>
+    <string name="tv_patch">Security patch</string>
+    <string name="tv_kernel">Linux kernel</string>
+    <string name="tv_resolution">Interface resolution</string>
+    <string name="tv_refresh">Refresh rate</string>
+    <string name="tv_density">Screen density</string>
+    <string name="tv_connection">Connection</string>
+    <string name="tv_ip">Local IP address</string>
+    <string name="tv_profile_standard">Standard</string>
+    <string name="tv_profile_low">Low RAM</string>
+    <string name="tv_link_wifi">Wi-Fi</string>
+    <string name="tv_link_ethernet">Ethernet cable</string>
+    <string name="tv_link_other">Other</string>
+
+    <!-- About -->
+    <string name="about_title">About HOME</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="about_license">Licensed under GPL-3.0-or-later</string>
+    <string name="about_source">Source code: %1$s</string>
+    <string name="about_third_party">Third-party licenses</string>
+
+    <!-- Home screen editor -->
+    <string name="editor_wallpaper">Wallpaper</string>
+    <string name="editor_appearance">Appearance</string>
+    <string name="wallpaper_cinematic">Beach Cove</string>
+    <string name="wallpaper_beach_sunset">Sunset Beach</string>
+    <string name="wallpaper_beach_dawn">Dawn Beach</string>
+    <string name="wallpaper_aurora">Aurora</string>
+    <string name="wallpaper_mountain_stars">Starry Mountains</string>
+    <string name="wallpaper_misty_forest">Misty Forest</string>
+    <string name="wallpaper_glass_facade">Glass Facade</string>
+    <string name="wallpaper_synthwave_grid">Synthwave Grid</string>
+    <string name="wallpaper_mirror_lake">Mirror Lake</string>
+    <string name="editor_round_favorites">Round favorites</string>
+    <string name="editor_breadcrumb_edit">Edit</string>
+    <string name="editor_title">Edit home screen</string>
+    <string name="editor_done">Done</string>
+    <string name="editor_favorites_order">Favorites</string>
+    <string name="editor_favorites_description">Choose the order of the apps on the dock. Select one and use the buttons to move it or remove it.</string>
+    <string name="editor_use_arrows">Use the arrows to move</string>
+    <string name="editor_add_app">Add app:</string>
+    <plurals name="editor_limit_reached">
+        <item quantity="one">Limit of %1$d favorite</item>
+        <item quantity="other">Limit of %1$d favorites</item>
+    </plurals>
+    <string name="editor_restore_defaults">Restore defaults</string>
+    <string name="editor_restore_title">Restore the default home screen?</string>
+    <string name="editor_restore_body">Your favorites go back to the first-use setup. Your usage history is kept.</string>
+    <string name="editor_restore_confirm">Restore</string>
+    <string name="editor_cancel">Cancel</string>
+
+    <!-- Context menu (the Menu button) -->
+    <string name="menu_add_home">Add to Home</string>
+    <string name="menu_remove_home">Remove from Home</string>
+    <string name="menu_move">Move</string>
+    <string name="menu_app_info">App info</string>
+    <string name="menu_uninstall">Uninstall</string>
+
+    <!-- Remote control mapping -->
+    <string name="keymap_title">Remote control mapping</string>
+    <string name="keymap_subtitle">Customize remote buttons for HOME commands, TV settings, and apps.</string>
+    <string name="keymap_section_commands">HOME commands</string>
+    <string name="keymap_section_settings">Settings shortcuts</string>
+    <string name="keymap_section_apps">App shortcuts</string>
+    <string name="command_menu">Context menu</string>
+    <string name="command_inputs">TV inputs</string>
+    <string name="setting_sleep">TV Sleep Timer &amp; Power</string>
+    <string name="setting_picture">TV Picture &amp; Display</string>
+    <string name="setting_sound">TV Sound &amp; Audio</string>
+    <string name="setting_wifi">Network &amp; Wi-Fi</string>
+    <string name="setting_bluetooth">Bluetooth &amp; Remotes</string>
+    <string name="setting_apps">System Applications</string>
+    <string name="setting_android">Android Settings</string>
+    <string name="setting_lume_settings">HOME Settings</string>
+    <string name="setting_lume_editor">Edit Home Screen</string>
+    <string name="setting_lume_tvinfo">TV Information</string>
+    <string name="setting_storage">Storage</string>
+    <string name="setting_language">Language</string>
+    <string name="setting_datetime">Date &amp; Time</string>
+    <string name="setting_keyboard">Keyboard</string>
+    <string name="setting_captions">Captions</string>
+    <string name="setting_location">Location</string>
+    <string name="setting_security">Security &amp; Restrictions</string>
+    <string name="setting_developer">Developer Options</string>
+    <string name="setting_home_app">Default Home App</string>
+    <string name="setting_about">About the TV</string>
+    <string name="keymap_add_key">Add key</string>
+    <string name="keymap_add_setting">Add shortcut</string>
+    <string name="keymap_add_app">Add app</string>
+    <string name="keymap_restore_action">Restore default</string>
+    <string name="keymap_remove_action">Remove shortcut</string>
+    <string name="keymap_restore_defaults">Restore factory defaults</string>
+    <string name="keymap_listening_title">Press a key</string>
+    <string name="keymap_listening_hint">Back to cancel</string>
+    <string name="keymap_reserved_key_warning">Reserved key. Pick another, or Back to cancel.</string>
+    <string name="keymap_listening_for">For: %1$s</string>
+    <string name="keymap_remove_key">Remove %1$s</string>
+    <string name="keymap_already_default">Already the default</string>
+    <string name="keymap_pick_app_title">Choose an app</string>
+    <string name="keymap_pick_app_subtitle">Pick the app the key will open</string>
+    <string name="keymap_pick_setting_title">Choose a shortcut</string>
+    <string name="keymap_pick_setting_subtitle">Pick the screen the key will open</string>
+    <string name="keymap_dialog_restore_title">Restore factory defaults?</string>
+    <string name="keymap_dialog_restore_body">All custom remote control keys, setting shortcuts, and app shortcuts will be reset to defaults.</string>
+    <string name="key_menu">Menu</string>
+    <string name="key_favorite">Favorite</string>
+    <string name="key_input">Input</string>
+    <string name="key_guide">Guide</string>
+    <string name="key_info">Info</string>
+    <string name="key_captions">Captions</string>
+    <string name="key_tv">TV</string>
+    <string name="key_red">Red</string>
+    <string name="key_green">Green</string>
+    <string name="key_yellow">Yellow</string>
+    <string name="key_blue">Blue</string>
+    <string name="key_channel_up">Channel +</string>
+    <string name="key_channel_down">Channel -</string>
+    <string name="key_volume_up">Volume +</string>
+    <string name="key_volume_down">Volume -</string>
+    <string name="key_volume_mute">Mute</string>
+    <string name="key_play_pause">Play/Pause</string>
+    <string name="key_stop">Stop</string>
+    <string name="key_fast_forward">Fast Forward</string>
+    <string name="key_rewind">Rewind</string>
+    <string name="key_settings">Settings</string>
+    <string name="key_fallback">Key %1$d</string>
+
+    <!-- Messages -->
+    <string name="toast_app_not_found">App not found</string>
+    <string name="toast_key_mapped">Key assigned</string>
+
+    <!-- Quick TV controls -->
+    <string name="control_title">Control Center</string>
+    <string name="control_wifi">Wi-Fi</string>
+    <string name="control_bluetooth">Bluetooth</string>
+    <string name="control_inputs">Inputs</string>
+    <string name="control_picture">Picture</string>
+    <string name="control_sound">Sound</string>
+    <string name="control_ambient">Ambient mode</string>
+    <string name="control_apps">Apps</string>
+    <string name="control_settings">Settings</string>
+</resources>

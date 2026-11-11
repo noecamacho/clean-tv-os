@@ -1,0 +1,155 @@
+plugins {
+    id "com.android.application"
+}
+
+// Signing: a release is signed with the key in LUME_KEYSTORE when it is set (the CI and the
+// container build pass it as a secret). Without it the release uses the debug key, which is
+// fine for installing it yourself but must not be published.
+def releaseKeystore = System.getenv("LUME_KEYSTORE")
+
+// The version of the build (see the platform-compatibility spec): LUME_VERSION_NAME with the
+// leading "v"s stripped (release tag), else the short git commit (+ "-dirty" when a tracked file
+// has uncommitted changes), else "dev".
+def gitOutput = { List<String> args ->
+    try {
+        def out = providers.exec { commandLine(["git"] + args); workingDir rootProject.projectDir.parentFile; ignoreExitValue = true }
+        return out.result.get().exitValue == 0 ? out.standardOutput.asText.get().trim() : ""
+    } catch (Exception ignored) {
+        return ""
+    }
+}
+def envVersion = (System.getenv("LUME_VERSION_NAME") ?: "").trim().replaceFirst(/^v+/, "")
+def gitHash = envVersion ? "" : gitOutput(["rev-parse", "--short", "HEAD"])
+def gitDirty = gitHash && gitOutput(["status", "--porcelain", "--untracked-files=no"])
+def lumeVersion = envVersion ?: (gitHash ? gitHash + (gitDirty ? "-dirty" : "") : "dev")
+// versionCode: a release X.Y.Z -> X*10000 + Y*100 + Z, ignoring any pre-release suffix; otherwise
+// LUME_VERSION_CODE (the container build counts the commits on the host), else the commit count, else 1.
+def lumeVersionCode
+if (lumeVersion ==~ /\d+\.\d+\.\d+(-.*)?/) {
+    lumeVersionCode = lumeVersion.split("-")[0].tokenize(".").inject(0) { total, part -> total * 100 + part.toInteger() }
+} else {
+    lumeVersionCode = (System.getenv("LUME_VERSION_CODE") ?: gitOutput(["rev-list", "--count", "HEAD"]) ?: "1").toInteger()
+}
+
+// Repository root (where the Cargo workspace lives).
+def lumeRepoRoot = rootProject.projectDir.parentFile
+
+android {
+    namespace "app.lume.tv"
+    compileSdk 36
+
+    defaultConfig {
+        // Provisional until the final applicationId is decided.
+        applicationId "app.lume.tv"
+        minSdk 28
+        targetSdk 36
+        versionCode lumeVersionCode
+        versionName lumeVersion
+    }
+
+    signingConfigs {
+        if (releaseKeystore) {
+            release {
+                storeFile file(releaseKeystore)
+                storePassword System.getenv("LUME_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("LUME_KEY_ALIAS")
+                keyPassword System.getenv("LUME_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            // x86 and x86_64 only in debug, for the Android TV emulators.
+            ndk { abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64" }
+        }
+        release {
+            ndk { abiFilters "armeabi-v7a", "arm64-v8a" }
+            signingConfig releaseKeystore ? signingConfigs.release : signingConfigs.debug
+            minifyEnabled true
+            proguardFiles "proguard-rules.pro"
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    androidResources {
+        // The wallpapers are QOI (already compressed): stored, so the APK reads them without inflating.
+        noCompress += "qoi"
+    }
+
+    packaging {
+        jniLibs {
+            // Keep native libraries 16 KB aligned inside the APK.
+            useLegacyPackaging = false
+        }
+    }
+}
+
+// cargo-ndk: builds liblume.so per ABI and hands it to APK packaging.
+// Every library is linked with 16 KB page alignment.
+abstract class CargoNdkTask extends DefaultTask {
+    @Input abstract ListProperty<String> getAbis()
+    @Input abstract Property<Boolean> getRelease()
+    @Input abstract Property<String> getVersionName()
+    @Internal abstract DirectoryProperty getRepoRoot()
+    @OutputDirectory abstract DirectoryProperty getOutputDir()
+
+    @Inject abstract ExecOperations getExecOps()
+
+    @TaskAction
+    void build() {
+        def args = ["cargo", "ndk"]
+        abis.get().each { args += ["-t", it] }
+        args += ["-o", outputDir.get().asFile.absolutePath, "build", "-p", "lume-app"]
+        if (release.get()) args += ["--release"]
+        execOps.exec {
+            workingDir repoRoot.get().asFile
+            commandLine args
+            // Rustflags and 16 KB page-alignment are defined per target in .cargo/config.toml.
+            // The Rust side must show exactly the versionName of the APK.
+            environment "LUME_VERSION_NAME", versionName.get()
+        }
+    }
+}
+
+// The wallpapers are read by the Rust side from the APK's assets (one copy of each, not one inside
+// every liblume.so): stage the QOI files of the catalog under assets/wallpaper/.
+abstract class StageWallpapersTask extends DefaultTask {
+    @InputDirectory abstract DirectoryProperty getSourceDir()
+    @OutputDirectory abstract DirectoryProperty getOutputDir()
+
+    @Inject abstract FileSystemOperations getFileOps()
+
+    @TaskAction
+    void stage() {
+        fileOps.sync {
+            from(sourceDir) { include "*.qoi" }
+            into(outputDir.dir("wallpaper"))
+        }
+    }
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        def isDebug = variant.buildType == "debug"
+        def cap = variant.name.capitalize()
+        def task = tasks.register("cargoNdk${cap}", CargoNdkTask) {
+            abis.set(isDebug ? ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"] : ["armeabi-v7a", "arm64-v8a"])
+            release.set(!isDebug)
+            versionName.set(lumeVersion)
+            repoRoot.set(lumeRepoRoot)
+            outputDir.set(layout.buildDirectory.dir("rustJniLibs/${variant.name}"))
+        }
+        variant.sources.jniLibs.addGeneratedSourceDirectory(task, CargoNdkTask::getOutputDir)
+
+        def stage = tasks.register("stageWallpapers${cap}", StageWallpapersTask) {
+            sourceDir.set(new File(lumeRepoRoot, "crates/lume-core/assets/wallpaper"))
+            outputDir.set(layout.buildDirectory.dir("wallpaperAssets/${variant.name}"))
+        }
+        variant.sources.assets.addGeneratedSourceDirectory(stage, StageWallpapersTask::getOutputDir)
+    }
+}

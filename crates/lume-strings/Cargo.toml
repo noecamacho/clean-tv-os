@@ -1,0 +1,8 @@
+[package]
+name = "lume-strings"
+description = "Reads Android strings.xml translations and compiles them into Rust tables"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]

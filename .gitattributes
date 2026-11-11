@@ -1,0 +1,4 @@
+tools/wallpaper/masters/*.png filter=lfs diff=lfs merge=lfs -text
+crates/lume-core/assets/wallpaper/*.rgba binary
+crates/lume-core/assets/wallpaper/*.qoi binary
+tools/wallpaper/generated/*.png binary

@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/lume-css",
+    "crates/lume-strings",
+    "crates/lume-version",
+    "crates/lume-core",
+    "crates/lume-app",
+    "tools/lume-desktop",
+]
+
+[workspace.package]
+# Not the build version: that comes from the release tag or the git commit (crates/lume-version).
+version = "1.0.0"
+repository = "https://github.com/douglaspands/lume-tv-launcher"
+edition = "2021"
+license = "GPL-3.0-or-later"
+rust-version = "1.99"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true

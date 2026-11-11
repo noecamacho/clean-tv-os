@@ -1,0 +1,10 @@
+target/
+build/
+dist/
+mockup/
+.git/
+.claude/
+openspec/
+**/build/
+**/.gradle/
+*.Zone.Identifier

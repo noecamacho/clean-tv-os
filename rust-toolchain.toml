@@ -1,0 +1,10 @@
+[toolchain]
+channel = "1.99.1"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
+targets = [
+    "armv7-linux-androideabi",
+    "aarch64-linux-android",
+    "i686-linux-android",
+    "x86_64-linux-android",
+]

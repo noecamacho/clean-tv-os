@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HOME</string>
+    <string name="tagline">ваш дом на ТВ</string>
+
+    <!-- Верхняя панель -->
+    <string name="tab_home">Главная</string>
+    <string name="tab_apps">Приложения</string>
+
+    <!-- Главный экран -->
+    <string name="home_favorites_title">Ваши избранные приложения</string>
+    <string name="home_add_favorites">Добавить избранное</string>
+
+    <!-- Экран приложений -->
+    <string name="apps_title">Все приложения</string>
+
+    <!-- Настройки HOME -->
+    <string name="settings_title">Настройки</string>
+    <string name="settings_home_screen">Главный экран</string>
+    <string name="settings_key_mapping">Настройка пульта</string>
+    <string name="settings_tv_info">Информация о ТВ</string>
+    <string name="settings_about">О HOME</string>
+
+    <!-- Панель состояния ТВ -->
+    <string name="stats_title">СОСТОЯНИЕ ТВ</string>
+    <string name="stats_memory">Память</string>
+    <string name="stats_disk">Хранилище</string>
+    <string name="stats_cpu">Частота ЦП</string>
+
+    <!-- TV information -->
+    <string name="tv_info_title">Информация о ТВ</string>
+    <string name="tv_section_device">УСТРОЙСТВО</string>
+    <string name="tv_section_processing">ПРОЦЕССОР И ГРАФИКА</string>
+    <string name="tv_section_memory">ПАМЯТЬ И НАКОПИТЕЛЬ</string>
+    <string name="tv_section_system">СИСТЕМА И ПРОШИВКА</string>
+    <string name="tv_section_display">ЭКРАН</string>
+    <string name="tv_section_network">СЕТЬ</string>
+    <string name="tv_brand">Бренд</string>
+    <string name="tv_model">Модель</string>
+    <string name="tv_manufacturer">Производитель</string>
+    <string name="tv_board">Плата</string>
+    <string name="tv_soc">Процессор (SoC)</string>
+    <string name="tv_cpu">ЦП</string>
+    <string name="tv_cores">Ядра</string>
+    <string name="tv_abi">Архитектура (ABI)</string>
+    <string name="tv_gpu">GPU</string>
+    <string name="tv_opengl">OpenGL ES</string>
+    <string name="tv_ram">Память (ОЗУ)</string>
+    <string name="tv_memory_profile">Профиль памяти</string>
+    <string name="tv_storage_total">Встроенный накопитель</string>
+    <string name="tv_storage_free">Свободно на накопителе</string>
+    <string name="tv_android">Версия Android</string>
+    <string name="tv_api">Уровень API</string>
+    <string name="tv_firmware">Прошивка ТВ</string>
+    <string name="tv_patch">Патч безопасности</string>
+    <string name="tv_kernel">Ядро Linux</string>
+    <string name="tv_resolution">Разрешение интерфейса</string>
+    <string name="tv_refresh">Частота обновления</string>
+    <string name="tv_density">Плотность экрана</string>
+    <string name="tv_connection">Подключение</string>
+    <string name="tv_ip">Локальный IP-адрес</string>
+    <string name="tv_profile_standard">Стандартный</string>
+    <string name="tv_profile_low">Мало ОЗУ</string>
+    <string name="tv_link_wifi">Wi-Fi</string>
+    <string name="tv_link_ethernet">Кабель Ethernet</string>
+    <string name="tv_link_other">Другое</string>
+
+    <!-- О программе -->
+    <string name="about_title">О HOME</string>
+    <string name="about_version">Версия %1$s</string>
+    <string name="about_license">Лицензия GPL-3.0-or-later</string>
+    <string name="about_source">Исходный код: %1$s</string>
+    <string name="about_third_party">Лицензии третьих сторон</string>
+
+    <!-- Редактор главного экрана -->
+    <!-- Home screen editor -->
+    <string name="editor_wallpaper">Обои</string>
+    <string name="editor_appearance">Оформление</string>
+    <string name="wallpaper_cinematic">Бирюзовая бухта</string>
+    <string name="wallpaper_beach_sunset">Закатный пляж</string>
+    <string name="wallpaper_beach_dawn">Рассветный пляж</string>
+    <string name="wallpaper_aurora">Аврора</string>
+    <string name="wallpaper_mountain_stars">Звёздные горы</string>
+    <string name="wallpaper_misty_forest">Ночной лес</string>
+    <string name="wallpaper_glass_facade">Стеклянный фасад</string>
+    <string name="wallpaper_synthwave_grid">Сетка синтвейв</string>
+    <string name="wallpaper_mirror_lake">Зеркальное озеро</string>
+    <string name="editor_round_favorites">Круглые значки</string>
+    <string name="editor_breadcrumb_edit">Изменить</string>
+    <string name="editor_title">Изменить главный экран</string>
+    <string name="editor_done">Готово</string>
+    <string name="editor_favorites_order">Избранное</string>
+    <string name="editor_favorites_description">Задайте порядок приложений в доке. Выберите одно и кнопками переместите или удалите его.</string>
+    <string name="editor_use_arrows">Перемещайте стрелками</string>
+    <string name="editor_add_app">Добавить:</string>
+    <plurals name="editor_limit_reached">
+        <item quantity="one">Предел: %1$d избранное</item>
+        <item quantity="few">Предел: %1$d избранных</item>
+        <item quantity="many">Предел: %1$d избранных</item>
+        <item quantity="other">Предел: %1$d избранного</item>
+    </plurals>
+    <string name="editor_restore_defaults">Сбросить</string>
+    <string name="editor_restore_title">Восстановить главный экран по умолчанию?</string>
+    <string name="editor_restore_body">Избранное вернётся к начальной настройке. История использования сохранится.</string>
+    <string name="editor_restore_confirm">Восстановить</string>
+    <string name="editor_cancel">Отмена</string>
+
+    <!-- Контекстное меню (кнопка «Меню») -->
+    <string name="menu_add_home">Добавить на главный</string>
+    <string name="menu_remove_home">Убрать с главного</string>
+    <string name="menu_move">Переместить</string>
+    <string name="menu_app_info">О приложении</string>
+    <string name="menu_uninstall">Удалить</string>
+
+    <!-- Настройка пульта -->
+    <string name="keymap_title">Настройка пульта</string>
+    <string name="keymap_subtitle">Настройте кнопки пульта для команд HOME, настроек ТВ и приложений.</string>
+    <string name="keymap_section_commands">Команды HOME</string>
+    <string name="keymap_section_settings">Ярлыки настроек</string>
+    <string name="keymap_section_apps">Ярлыки приложений</string>
+    <string name="command_menu">Контекстное меню</string>
+    <string name="command_inputs">Входы ТВ</string>
+    <string name="setting_sleep">Таймер сна и питание ТВ</string>
+    <string name="setting_picture">Изображение и экран ТВ</string>
+    <string name="setting_sound">Звук и аудио ТВ</string>
+    <string name="setting_wifi">Сеть и Wi-Fi</string>
+    <string name="setting_bluetooth">Bluetooth и пульты</string>
+    <string name="setting_apps">Приложения системы</string>
+    <string name="setting_android">Настройки Android</string>
+    <string name="setting_lume_settings">Настройки HOME</string>
+    <string name="setting_lume_editor">Редактировать главный экран</string>
+    <string name="setting_lume_tvinfo">Информация о ТВ</string>
+    <string name="setting_storage">Хранилище</string>
+    <string name="setting_language">Язык</string>
+    <string name="setting_datetime">Дата и время</string>
+    <string name="setting_keyboard">Клавиатура</string>
+    <string name="setting_captions">Субтитры</string>
+    <string name="setting_location">Местоположение</string>
+    <string name="setting_security">Безопасность</string>
+    <string name="setting_developer">Для разработчиков</string>
+    <string name="setting_home_app">Приложение главного экрана</string>
+    <string name="setting_about">О телевизоре</string>
+    <string name="keymap_add_key">Добавить кнопку</string>
+    <string name="keymap_add_setting">Добавить ярлык</string>
+    <string name="keymap_add_app">Добавить приложение</string>
+    <string name="keymap_restore_action">Сбросить по умолчанию</string>
+    <string name="keymap_remove_action">Удалить ярлык</string>
+    <string name="keymap_restore_defaults">Сброс к заводским настройкам</string>
+    <string name="keymap_listening_title">Нажмите кнопку</string>
+    <string name="keymap_listening_hint">Назад — отмена</string>
+    <string name="keymap_reserved_key_warning">Зарезервировано. Выберите другую или «Назад».</string>
+    <string name="keymap_listening_for">Для: %1$s</string>
+    <string name="keymap_remove_key">Удалить %1$s</string>
+    <string name="keymap_already_default">Уже по умолчанию</string>
+    <string name="keymap_pick_app_title">Выбор приложения</string>
+    <string name="keymap_pick_app_subtitle">Выберите приложение, которое откроет кнопка</string>
+    <string name="keymap_pick_setting_title">Выбор ярлыка</string>
+    <string name="keymap_pick_setting_subtitle">Выберите экран, который откроет кнопка</string>
+    <string name="keymap_dialog_restore_title">Сбросить на заводские?</string>
+    <string name="keymap_dialog_restore_body">Все назначенные кнопки, ярлыки настроек и приложений будут сброшены к заводским настройкам.</string>
+    <string name="key_menu">Меню</string>
+    <string name="key_favorite">Избранное</string>
+    <string name="key_input">Вход</string>
+    <string name="key_guide">Гид</string>
+    <string name="key_info">Инфо</string>
+    <string name="key_captions">Субтитры</string>
+    <string name="key_tv">ТВ</string>
+    <string name="key_red">Красная</string>
+    <string name="key_green">Зеленая</string>
+    <string name="key_yellow">Желтая</string>
+    <string name="key_blue">Синяя</string>
+    <string name="key_channel_up">Канал +</string>
+    <string name="key_channel_down">Канал -</string>
+    <string name="key_volume_up">Громкость +</string>
+    <string name="key_volume_down">Громкость -</string>
+    <string name="key_volume_mute">Без звука</string>
+    <string name="key_play_pause">Воспр./Пауза</string>
+    <string name="key_stop">Стоп</string>
+    <string name="key_fast_forward">Вперед</string>
+    <string name="key_rewind">Назад</string>
+    <string name="key_settings">Настройки</string>
+    <string name="key_fallback">Кнопка %1$d</string>
+
+    <!-- Сообщения -->
+    <string name="toast_app_not_found">Приложение не найдено</string>
+    <string name="toast_key_mapped">Кнопка назначена</string>
+
+    <!-- Quick TV controls -->
+    <string name="control_title">Пункт управления</string>
+    <string name="control_wifi">Wi-Fi</string>
+    <string name="control_bluetooth">Bluetooth</string>
+    <string name="control_inputs">Входы</string>
+    <string name="control_picture">Изображение</string>
+    <string name="control_sound">Звук</string>
+    <string name="control_ambient">Фоновый режим</string>
+    <string name="control_apps">Приложения</string>
+    <string name="control_settings">Настройки</string>
+</resources>

@@ -1,0 +1,74 @@
+# Rust (Cargo.lock is tracked: this workspace ships an app)
+target/
+Cargo.lock.bak
+**/*.rs.bk
+*.pdb
+mutants.out*/
+flamegraph.svg
+perf.data*
+*.profraw
+*.profdata
+
+# Python (uv)
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.python-version
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Java / Android / Gradle
+build/
+.gradle/
+.kotlin/
+.cxx/
+.externalNativeBuild/
+captures/
+android/local.properties
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.hprof
+hs_err_pid*
+dist/
+# keep the Gradle wrapper jar tracked
+!gradle-wrapper.jar
+
+# Signing material
+*.jks
+*.keystore
+keystore.properties
+
+# OpenSpec / agent local state
+.claude/settings.local.json
+.claude/worktrees/
+
+# OS metadata
+*.Zone.Identifier
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+*.iml
+.vscode/
+*.swp
+*~
+
+# Logs and scratch screenshots
+*.log
+
+# Wallpaper candidates (local evaluation only)
+var/
+tools/bin/
+
+# Local tool state
+.serena/

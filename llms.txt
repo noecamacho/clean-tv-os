@@ -1,0 +1,21 @@
+# HOME / clean-tv-os
+
+> Launcher personal tvOS 26 inspirado para TCL 55Q5K. Código Rust/GLES2 basado en Lume (GPL-3.0-or-later). La interfaz visible se llama HOME; los identificadores `app.lume.tv` y `lume-*` se conservan para compatibilidad.
+
+## Documentación para agentes
+
+- [Guía de trabajo](AGENTS.md): reglas, estado Git, comandos, límites.
+- [Wiki LLM](docs/llm-wiki/INDEX.md): índice y ruta de lectura.
+- [Contexto compilado](llms-full.txt): un solo archivo con la wiki completa.
+- [Contexto y requisitos](docs/llm-wiki/context.md)
+- [Arquitectura](docs/llm-wiki/architecture.md)
+- [Diseño y rendimiento](docs/llm-wiki/design.md)
+- [Compilación, TV y rollback](docs/llm-wiki/operations.md)
+- [Referencias y procedencia](docs/llm-wiki/references.md)
+- [Pendientes](docs/llm-wiki/next-work.md)
+- [Specs vigentes](openspec/specs/)
+- [Evidencia de la TCL](docs/tvos26-tcl-55q5k.md)
+
+## Estado
+
+Rama `feat/tvos26-liquid-glass` con cambios sin commit. APK firmado `dist/lume-0.3.9-home-controls-release.apk` probado en TCL, Google TV todavía Home predeterminado. TV Home de tinulica es referencia sin código incorporado. No publiques ni cambies el launcher del sistema por inferencia.

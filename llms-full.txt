@@ -1,0 +1,245 @@
+# HOME · contexto compilado para LLM
+
+Generado desde docs/llm-wiki/ con uv run python scripts/build-llm-wiki.py. Edita las páginas fuente y regenera este archivo. No contiene secretos.
+
+
+---
+
+<!-- source: docs/llm-wiki/INDEX.md -->
+
+# Wiki LLM · HOME
+
+Esta wiki es el contexto de trabajo para otros agentes. Se compiló el 11 de noviembre de 2026 a partir del código local, las specs y las pruebas en la TCL; no sustituye la lectura del código cuando se cambia una función.
+
+## Ruta de lectura
+
+1. [Contexto y requisitos](context.md): qué pidió el usuario, qué existe y qué falta.
+2. [Arquitectura](architecture.md): módulos Rust, puente Android, recursos y navegación.
+3. [Diseño y rendimiento](design.md): tvOS 26, vidrio, fondos, foco y límites reales.
+4. [Dispositivo y operaciones](operations.md): compilar, instalar, probar, recuperar.
+5. [Referencias y procedencia](references.md): Lume, TV Home, artículo de AppleInsider, licencias.
+6. [Pendientes y guía de colaboración](next-work.md): riesgos, decisiones abiertas y pruebas futuras.
+
+## Fuentes de verdad
+
+- `AGENTS.md`: contrato de trabajo actual.
+- `openspec/specs/`: requisitos vigentes por capacidad; algunas secciones antiguas aún describen el upstream y deben armonizarse al tocarlas.
+- `docs/tvos26-tcl-55q5k.md`: evidencia del APK y la TV.
+- `docs/upstream/`: documentación preservada del origen, **histórica** para este fork.
+- `llms-full.txt`: concatenación generada de esta wiki para asistentes que prefieren un solo archivo; actualízala con `uv run python scripts/build-llm-wiki.py`.
+
+## Identidad y rutas
+
+- Proyecto local: `~/Projects/clean-tv-os`.
+- Nombre visible: **HOME**.
+- Identificadores internos de compatibilidad: paquete `app.lume.tv`, actividad `LumeActivity`, crates `lume-*`, tema `themes/lume/theme.css`.
+- Repositorio: `noecamacho/clean-tv-os`, rama `main`, historial propio; cambios en `CHANGELOG.md`.
+- Origen del código: `douglaspands/lume-tv-launcher` en su commit `2e7421d` (GPL-3.0-or-later); no es un remoto.
+
+
+---
+
+<!-- source: docs/llm-wiki/context.md -->
+
+# Contexto del producto
+
+## Objetivo del usuario
+
+El usuario quiere un launcher para su TCL 55Q5K que se vea y se sienta lo más cercano posible a tvOS 26, con Liquid Glass aproximado, fondos de playa de gran calidad, nombre e icono visibles **HOME**, sin logos Lume, y navegación de aplicaciones muy fluida. La interfaz debe seguir el idioma de la TV, especialmente español e inglés. Pidió además un Centro de control con las funciones de tvOS que sean aplicables a este televisor. Autorizó proceder sin pedir confirmación en cada paso.
+
+La idea inicial fue probar `tinulica/tv-home`, después usar el proyecto Rust `douglaspands/lume-tv-launcher` como base liviana y reproducir el aspecto visual. El código actual deriva de Lume. TV Home sigue como referencia separada; su código no fue fusionado.
+
+## Implementado y comprobado
+
+- Nombre y recursos visuales de HOME, sin marca Lume en la interfaz principal; identificadores internos conservados para las actualizaciones.
+- Tres escenas de playa generadas para esta variante, empaquetadas como QOI con miniaturas. Beach Cove/Cala turquesa es la predeterminada.
+- Home al estilo tvOS: cinco banners por fila, la primera sobre una plataforma de vidrio, nombre solo bajo el banner enfocado; barra superior de vidrio con Apps, entradas, ajustes y reloj.
+- Centro de control de mosaicos de vidrio arriba a la derecha (se abre también con el botón Home estando en Inicio), navegación con D-pad, tarjetas Wi-Fi, Bluetooth, Entradas, Imagen, Sonido, Modo ambiente, Apps y Ajustes. Entradas se oculta si el selector no está disponible.
+- Traducciones en `values` (inglés), `values-es`, `values-pt-rBR`, `values-id` y `values-ru`; la TV probada usa `es-ES`.
+- APK firmado `0.4.0-tvos` instalado con `adb install -r`. Google TV continúa siendo el Home del sistema; el servicio de accesibilidad `HomeKeyService` hace que el botón Home abra HOME (véase operations.md).
+- Pruebas Rust: 506 aprobadas, 2 ignoradas; verificación del APK: 31.08 MB, ARMv7 y ARM64, 9 recursos QOI de fondos.
+- Capturas reales copiadas a `docs/llm-wiki/images/`: Home, barra superior y Centro de control en la TCL. La del panel muestra el rótulo español completo de Modo ambiente.
+
+## Alcance real
+
+Esto es una app launcher, no una modificación del firmware. No tiene acceso al reproductor de otras apps, a un compositor global de vídeo, a Apple Home, perfiles de Apple TV ni VPN del sistema. El vidrio refracta la textura del fondo de la propia app mediante una muestra de shader; no puede copiar el motor privado de Apple. El launcher del sistema no se toca; el botón Home abre HOME solo mientras el servicio de accesibilidad esté activado.
+
+La tarjeta Sonido y la de Imagen llegan a la misma actividad `DisplaySoundActivity` en este firmware TCL. El acceso heredado llamado Sleep en el código abre **Modo ambiente** en la TCL y se etiquetó así en el Centro de control. El selector de entradas mostró Google TV Home, AirPlay y TV; no había un HDMI activo para probar cambio de fuente.
+
+
+---
+
+<!-- source: docs/llm-wiki/architecture.md -->
+
+# Arquitectura y mapa del código
+
+## Flujo
+
+`LumeActivity` (ciclo de vida y eventos Android) ↔ `LumeBridge` (consultas/Intents Android) ↔ JNI de `lume-app` ↔ `Shell`/`LumeApp` de `lume-core` ↔ lista de dibujo GLES2. Toda la UI propia, foco, transición, composición y estado reside en Rust. Java se usa para las APIs Android que el NDK no expone de forma adecuada.
+
+## Módulos principales
+
+| Ruta | Responsabilidad |
+| --- | --- |
+| `crates/lume-core/src/app/` | Estado de pantallas, D-pad, focus, Home, Apps, Centro de control, ajustes y menús. |
+| `app/home.rs`, `app/apps.rs`, `app/topbar.rs` | Diseño del estante, cuadrícula y barra superior. |
+| `app/control_center.rs` | Panel de vidrio, tarjetas y efectos de accesos directos. |
+| `app/painter.rs`, `render/gles2.rs`, `render/shaders.rs` | Comandos de dibujo, textura del fondo y GLES2. |
+| `ui/animation.rs`, `display.rs`, `shell/` | Animaciones, escala de 1280×720 y bucle de render. |
+| `home/config.rs`, `storage.rs` | Favoritos, wallpaper y persistencia local. |
+| `android/app/src/main/java/app/lume/tv/` | Actividad y puente de Android; resolución de ajustes según modelo TCL/AIWA. |
+| `android/app/src/main/res/values*/strings.xml` | Traducciones Android compiladas hacia el traductor Rust. |
+| `themes/lume/theme.css` | Tokens visuales compilados por el proyecto. |
+| `crates/lume-core/assets/wallpaper/` | Fondos QOI y miniaturas incluidas en el APK. |
+| `tools/wallpaper/` | Fuentes y scripts de preparación de wallpapers. |
+| `scripts/container-build.sh` | Buildx/Docker, Gradle, firma y artefactos en `dist/`. |
+
+## Invariantes
+
+- Mantén el `applicationId` `app.lume.tv` y la misma clave de firma si el objetivo es actualizar la app ya instalada y conservar preferencias. Renombrar paquete o firma requiere migración explícita.
+- Usa los efectos existentes (`OpenTvSetting`, `OpenInputs`, `OpenAndroidSettings`) para abrir paneles del sistema. No implementes conjeturas de toggles privilegiados.
+- El foco del Centro de control se calcula por fila y columna; Back vuelve a la pestaña anterior y deja enfocado el botón de control.
+- La app evita animación continua en reposo. El bucle duerme cuando no hay cambio visual; no agregues blur o pasadas a pantalla completa sin medir en la TCL.
+- Las specs de `openspec/specs/` deben registrar una capacidad nueva; el directorio `docs/upstream/` no es especificación de HOME.
+
+
+---
+
+<!-- source: docs/llm-wiki/design.md -->
+
+# Diseño, movimiento y rendimiento
+
+## Dirección visual
+
+Referencias: la [presentación práctica de tvOS 26 en AppleInsider](https://appleinsider.com/articles/25/06/10/tvos-26-hands-on-sleek-liquid-glass-redesign-new-control-center-and-more) y el repositorio TV Home, registrado en `references.md`. La composición usa la playa a pantalla completa, una barra translúcida en la parte superior, estante de apps bajo, contorno claro en el elemento enfocado y un panel de control en el extremo derecho. Son interpretaciones propias de imágenes públicas, no assets ni código de Apple.
+
+La implementación usa el fondo QOI ya cargado como fuente de una muestra con refracción en los bordes, gradientes semitransparentes, borde blanco fino y tintes oscuros para legibilidad. Los tres fondos de playa son originales de esta variante; sus estrellas/metadatos acompañan los QOI. La fuente de iconos Lucide se reduce con `scripts/subset-fonts.py`.
+
+Capturas de referencia tomadas en la TCL: [Home](images/home-tcl.png), [barra superior](images/topbar-tcl.png) y [Centro de control final](images/control-center-tcl.png). Para una evaluación visual, abre las imágenes originales a resolución completa; el Centro de control final incluye la etiqueta española completa «Modo ambiente».
+
+## Movimiento y rendimiento
+
+- Canvas lógico 1280×720 renderizado a **1920×1080** (1,5 px por unidad). El tope de 720p de la versión 0.3.9 ya no existe.
+- **Redibujado parcial**: cada cuadro compara su lista de dibujo con la anterior (`Frame::damage`) y solo repinta el rectángulo que cambió, con `glScissor`, `EGL_EXT_buffer_age` y `EGL_KHR_partial_update` (`draw` en `crates/lume-app/src/android/mod.rs`). Los cambios de textura (iconos, fondo, atlas rehecho) fuerzan un cuadro completo vía `Gles2Backend::take_content_changed`. Es lo que Android hace por TV Home y la razón de que aquel fuera fluido a 1080p.
+- La GPU real de la TCL 55Q5K es **PowerVR BXE-4-32** (OpenGL ES 3.2, Vulkan 1.1). La Mali-470 de `docs/device-notes.md` es la tele del autor de Lume.
+- Foco de banner: 260 ms `cubic-bezier(0.2, 0, 0, 1)`, escala 1,12 con un pequeño rebote, sombra amplia, borde claro de 2 unidades y nombre solo bajo el banner enfocado.
+- Centro de control: mosaicos de vidrio flotantes arriba a la derecha, sin panel; bajan desde la esquina en 240 ms; el mosaico enfocado se vuelve blanco.
+- Medida en TCL (0.3.15, 1080p, navegación por la primera fila con mando virtual `uinput`): mediana 16,7 ms, p95 17,0 ms, 2 intervalos de 33 ms en ~120. Un cuadro completo a 1080p cuesta ~37 ms: lo pagan el desplazamiento vertical y la apertura del Centro de control, que oscurecen o mueven toda la pantalla. Son pruebas puntuales.
+- Para medir, deja al menos 600 ms entre teclas: las pausas menores de 100 ms entre animaciones se confunden con cuadros lentos. `adb shell input keyevent` arranca una VM por tecla y ensucia la medida; usa `adb shell uinput`.
+
+## Faltas conocidas respecto a tvOS
+
+No se reproduce el compositor privado Liquid Glass, la refracción de vídeo de otros procesos, el Centro de control del sistema ni la experiencia de reproducción de Apple TV. No hay perfiles de usuario, Apple Home, VPN, panel de energía ni temporizador real de apagado. Cada función futura debe comprobarse en el firmware TCL antes de mostrar un control que sugiera una acción que no puede ejecutar.
+
+Las specs de `openspec/specs/design-system/spec.md` heredaron reglas del tema original y tienen un apartado de variante tvOS 26. Si una sección antigua contradice la variante o la UI comprobada, actualiza la spec al modificar ese componente.
+
+
+---
+
+<!-- source: docs/llm-wiki/operations.md -->
+
+# TCL 55Q5K · compilación y operaciones
+
+## Equipo probado
+
+TCL 55Q5K, Google TV con Android 12/API 31, ABI `armeabi-v7a`, SoC Realtek rtd6748, GPU PowerVR BXE-4-32 (OpenGL ES 3.2, Vulkan 1.1, `EGL_KHR_partial_update`), pantalla 4K con UI a 1920×1080, plataforma G10, firmware `V8-0008T01-LF1V521`, LAN `192.168.0.229`. La IP puede cambiar. El launcher del sistema es `com.google.android.apps.tv.launcherx/.home.HomeActivity`; HOME es `app.lume.tv/.LumeActivity`.
+
+## Datos privados fuera del repositorio
+
+`~/Projects/.clean-tv-os-private/signing/credentials.env` contiene variables de firma y señala el JKS privado en la misma carpeta. `~/Projects/.clean-tv-os-private/baseline/base.apk` es el APK anterior a esta variante. No añadas ninguno a Git ni pegues sus contenidos en una respuesta. La firma permite `adb install -r` sin borrar datos; instalar un APK firmado con otra clave sobre `app.lume.tv` falla o requiere desinstalar y perder preferencias.
+
+## Construir y verificar
+
+```sh
+cd ~/Projects/clean-tv-os
+docker run --rm -v "$PWD:/src" -w /src lume-toolchain:latest sh -lc 'cargo fmt --all && cargo test -q -p lume-core'
+set -a; source ~/Projects/.clean-tv-os-private/signing/credentials.env; set +a
+LUME_VERSION_NAME=v0.4.0-tvos scripts/container-build.sh release
+uv run python scripts/verify-apk.py dist/lume-0.4.0-tvos-release.apk
+```
+
+Para un cambio nuevo, aumenta la versión por encima de 400 en `LUME_VERSION_NAME`. El script empaqueta ARMv7 y ARM64 y genera APK/AAB en `dist/`. Comprueba que muestra firma de release; sin `LUME_KEYSTORE` produce un APK firmado con la clave de debug, que no actualiza la instalación actual. `dist/` está ignorado por Git: el APK final se copió localmente, pero otros agentes deben reconstruirlo si clonan el repositorio.
+
+## ADB y pruebas manuales
+
+```sh
+adb connect 192.168.0.229:5555
+adb -s 192.168.0.229:5555 devices
+adb -s 192.168.0.229:5555 install -r dist/lume-0.4.0-tvos-release.apk
+adb -s 192.168.0.229:5555 shell am start -n app.lume.tv/.LumeActivity
+adb -s 192.168.0.229:5555 shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME
+adb -s 192.168.0.229:5555 exec-out screencap -p > /tmp/home-check.png
+```
+
+En HOME, pulsa Arriba para mostrar la barra, desplázate hasta el icono de Centro de control y pulsa OK. Comprueba navegación izquierda/derecha/arriba/abajo, Back, Wi-Fi, Bluetooth, Imagen/Sonido, Entradas y Ajustes. El botón Home del control debe abrir Google TV. En la prueba anterior, Wi-Fi abrió `NetworkActivity`, Bluetooth `AddAccessoryActivity`, Imagen/Sonido `DisplaySoundActivity`, Modo ambiente `DaydreamActivity` y Entradas el panel TCL. No había fuente HDMI activa; un cambio real de HDMI sigue sin probarse.
+
+## Botón Home (HOME como launcher)
+
+`cmd package set-home-activity app.lume.tv/.LumeActivity` devuelve Success pero esta TCL lo ignora: Home sigue abriendo Google TV. Desde 0.3.10, `HomeKeyService` (servicio de accesibilidad que solo filtra teclas) abre HOME con el botón Home, al encender la pantalla y tras el arranque. TCL bloquea el enlace del servicio sin el app-op de autoarranque.
+
+```sh
+# Activar HOME como inicio
+adb -s 192.168.0.229:5555 shell appops set app.lume.tv APP_AUTO_START allow
+adb -s 192.168.0.229:5555 shell settings put secure enabled_accessibility_services app.lume.tv/app.lume.tv.HomeKeyService
+adb -s 192.168.0.229:5555 shell settings put secure accessibility_enabled 1
+# Volver a Google TV
+adb -s 192.168.0.229:5555 shell settings put secure enabled_accessibility_services null
+```
+
+También se puede apagar en Ajustes > Sistema > Accesibilidad > HOME. `adb shell input keyevent KEYCODE_HOME` **no** pasa por el filtro de accesibilidad y siempre abre Google TV; para probar sin el mando usa `adb shell uinput` con un dispositivo virtual (KEY_HOMEPAGE = 172). Comprobado el 2026-11-11 con uinput; encendido desde reposo y reinicio en frío sin comprobar, y el firmware puede desactivar el servicio por su cuenta.
+
+## Rollback
+
+La acción menos invasiva es pulsar Home: Google TV ya es el launcher predeterminado. Para retirar HOME, usa `adb -s 192.168.0.229:5555 uninstall app.lume.tv`; no hay que reactivar paquetes. El APK anterior está en `~/Projects/.clean-tv-os-private/baseline/base.apk`, pero tiene otra firma: para instalarlo hay que desinstalar HOME y se pierden sus preferencias. No deshabilites Google TV ni componentes TCL.
+
+
+---
+
+<!-- source: docs/llm-wiki/references.md -->
+
+# Referencias, procedencia y licencias
+
+| Referencia | Papel en HOME | Estado |
+| --- | --- | --- |
+| [douglaspands/lume-tv-launcher](https://github.com/douglaspands/lume-tv-launcher) | Base de código Rust/Android. | Fork desde `2e7421d`; remoto local `upstream` solo para lectura. Código GPL-3.0-or-later (`LICENSE`). |
+| [tinulica/tv-home](https://github.com/tinulica/tv-home) | Referencia de aspecto y experiencia Apple TV para TCL. | **Ningún archivo fuente suyo se incorporó**. Revisión consultada: `1f512fca8a4d01cdf89bdf987f6f245eec2e4cd5`. No había licencia general en la raíz de ese checkout; revisar los derechos antes de copiar código o assets. |
+| [AppleInsider: tvOS 26 hands-on](https://appleinsider.com/articles/25/06/10/tvos-26-hands-on-sleek-liquid-glass-redesign-new-control-center-and-more) | Referencia pública del top bar y Centro de control. | Solo observación visual. No se copiaron imágenes ni software de Apple. |
+| [Blackphenixlord/apple-tv-launcher](https://github.com/Blackphenixlord/apple-tv-launcher) | Alternativa mencionada al iniciar la exploración. | No se incorporó ni se ha evaluado para esta variante. Comprobar existencia, licencia y compatibilidad antes de usar. |
+| `crates/lume-core/assets/wallpaper/` | Fondos de playa generados para esta variante. | Revisar `docs/wallpaper.md` y los metadatos de los QOI antes de redistribuir. |
+
+Para consultar el código de TV Home en otra máquina sin mezclarlo con el build:
+
+```sh
+git clone https://github.com/tinulica/tv-home.git /tmp/tv-home-reference
+git -C /tmp/tv-home-reference checkout 1f512fca8a4d01cdf89bdf987f6f245eec2e4cd5
+```
+
+El nombre y marca Lume no forman parte de la identidad visible de HOME. El paquete y los nombres internos persisten por compatibilidad. El código base conserva su licencia y avisos. No atribuyas a TV Home una implementación que aquí se desarrolló sobre Lume.
+
+
+---
+
+<!-- source: docs/llm-wiki/next-work.md -->
+
+# Pendientes y colaboración
+
+## Estado antes de iniciar cambios
+
+El trabajo vive en `main` de `noecamacho/clean-tv-os`. El APK de `dist/` no se versiona. No hagas commit o push sin que el usuario lo solicite.
+
+## Pendientes verificables
+
+1. Hacer una revisión visual en la TV con el usuario: proporciones de la barra y panel, iconografía y sensación del foco. Hay una captura final documentada, pero la semejanza exacta con tvOS 26 sigue siendo subjetiva.
+2. Medir navegación prolongada, arranque y memoria en la versión 0.3.9 si se cambia el render. Las medidas actuales son muestras puntuales.
+3. Probar una entrada HDMI cuando haya una fuente conectada. Solo se verificó que se abre el panel TCL.
+4. La tarjeta Sonido llega al mismo menú de Imagen en este firmware. Podría ofrecer un acceso más específico si se encuentra una actividad estable que exista realmente en el DEX de esta TCL.
+5. Revisar las specs heredadas y la pantalla Acerca de antes de cualquier distribución. Hay textos/README upstream archivados y nombres internos Lume que no deben cambiarse sin un plan de migración.
+6. Perfiles, VPN, automatización de hogar, energía y temporizador: primero comprobar permisos/APIs reales en Android 12 TCL. No mostrar un botón que lleve a una acción diferente de la etiqueta.
+
+7. Diseño tvOS pendiente: quitar la barra superior con pestañas (tvOS no la tiene), modo edición con temblor para reordenar con el D-pad, vidrio con fondo pre-difuminado, y animación de cierre del Centro de control.
+8. Controles directos: Wi-Fi/Bluetooth solo abren ajustes (Android 12 con `targetSdk` 36 no deja alternarlos); `tcl_sys_audio_sound_mode` existe en `Settings.System` pero no se ha probado que escribirlo cambie el audio; no se encontró clave de modo de imagen ni de brillo.
+9. `HomeKeyService`: probar encendido desde reposo y arranque en frío, y si el firmware desactiva el servicio.
+
+## Reglas de colaboración
+
+Trabaja en cambios pequeños y explica qué se cambió, por qué, qué pruebas se hicieron y qué no pudo probarse. Actualiza `openspec/specs/` y la página de wiki pertinente si cambia una decisión duradera. Regenera el contexto compilado con `uv run python scripts/build-llm-wiki.py` y comprueba `git diff --check` al terminar. La UI y respuesta al usuario deben ser españolas o seguir el idioma del sistema; conserva inglés como fallback. Evita publicar APKs o repositorios sin instrucción del usuario.

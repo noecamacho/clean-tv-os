@@ -1,0 +1,78 @@
+# Coletado por adb em 2026-10-20 (getprop, wm, /proc, dumpsys, pm). TV de referência TCL, final .6.
+ro.product.manufacturer=TCL
+ro.product.brand=TCL
+ro.product.model=BeyondTV2
+ro.product.name=BeyondTV2
+ro.product.device=BeyondTV
+ro.build.version.release=11
+ro.build.version.sdk=30
+ro.build.version.security_patch=2021-12-05
+ro.build.fingerprint=TCL/BeyondTV2/BeyondTV:11/PPR1.180610.011/AR05:user/release-keys
+ro.build.type=user
+ro.product.cpu.abi=armeabi-v7a
+ro.product.cpu.abilist=armeabi-v7a,armeabi
+ro.board.platform=rtd285o
+ro.hardware=rtd285o
+ro.soc.manufacturer=
+ro.soc.model=
+ro.boot.hardware=rtd285o
+ro.sf.lcd_density=320
+ro.config.low_ram=false
+ro.vendor.build.fingerprint=TCL/BeyondTV2/BeyondTV:11/PPR1.180610.011/AR05:user/release-keys
+persist.sys.locale=pt-BR
+ro.product.locale=en-GB
+ro.build.characteristics=nosdcard,tv
+ro.opengles.version=131072
+ro.hwui.use_vulkan=
+## wm
+Physical size: 1920x1080
+Physical density: 320
+## cpu
+      4 CPU part	: 0xd05
+      4 Features	: half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm aes pmull sha1 sha2 crc32 
+      1 Hardware	: rtd285o
+      4 model name	: ARMv7 Processor rev 0 (v7l)
+      1 processor	: 0
+      1 processor	: 1
+      1 processor	: 2
+      1 processor	: 3
+1100000
+4
+## mem
+MemTotal:        2097152 kB
+MemFree:           62348 kB
+MemAvailable:     510004 kB
+## storage
+/dev/block/mmcblk0p17  10588420 1800352   8640612  18% /data/user/0
+## gpu
+Sync configuration: [using: EGL_ANDROID_native_fence_sync EGL_KHR_wait_sync]
+EGL_KHR_image EGL_KHR_image_base EGL_KHR_image_pixmap EGL_KHR_gl_texture_2D_image EGL_KHR_gl_texture_cubemap_image EGL_KHR_gl_renderbuffer_image EGL_KHR_fence_sync EGL_KHR_wait_sync EGL_KHR_swap_buffers_with_damage EGL_EXT_swap_buffers_with_damage EGL_ANDROID_image_native_buffer EGL_ANDROID_recordable EGL_EXT_yuv_surface EGL_ANDROID_native_fence_sync EGL_ANDROID_framebuffer_target EGL_EXT_create_context_robustness EGL_ANDROID_blob_cache EGL_KHR_create_context EGL_KHR_partial_update EGL_KHR_create_context_no_error 
+GLES: ARM, Mali-470 MP, OpenGL ES 2.0 7bdaa90
+GL_EXT_debug_marker GL_OES_texture_npot GL_OES_vertex_array_object GL_OES_compressed_ETC1_RGB8_texture GL_EXT_compressed_ETC1_RGB8_sub_texture GL_OES_standard_derivatives GL_OES_EGL_image GL_OES_depth24 GL_ARM_rgba8 GL_ARM_mali_shader_binary GL_OES_depth_texture GL_OES_packed_depth_stencil GL_EXT_texture_format_BGRA8888 GL_OES_vertex_half_float GL_EXT_blend_minmax GL_OES_EGL_image_external GL_OES_EGL_sync GL_OES_rgb8_rgba8 GL_EXT_multisampled_render_to_texture GL_EXT_discard_framebuffer GL_OES_get_program_binary GL_ARM_mali_program_binary GL_EXT_shader_texture_lod GL_EXT_robustness GL_OES_depth_texture_cube_map GL_KHR_debug GL_ARM_shader_framebuffer_fetch GL_ARM_shader_framebuffer_fetch_depth_stencil GL_OES_mapbuffer GL_KHR_no_error
+## display
+  DisplayDeviceInfo{"Tela integrada": uniqueId="local:0", 1920 x 1080, modeId 1, defaultModeId 1, supportedModes [{id=1, width=1920, height=1080, fps=60.000004}], colorMode 0, supportedColorModes [0], HdrCapabilities HdrCapabilities{mSupportedHdrTypes=[1, 2, 3], mMaxLuminance=500.0, mMaxAverageLuminance=500.0, mMinLuminance=0.0}, allmSupported false, gameContentTypeSupported false, density 320, 3.572 x 1.976 dpi, appVsyncOff 1000000, presDeadline 16666666, touch INTERNAL, rotation 0, type INTERNAL, address {port=0}, deviceProductInfo null, state ON, FLAG_DEFAULT_DISPLAY, FLAG_ROTATES_WITH_CONTENT, FLAG_SECURE, FLAG_SUPPORTS_PROTECTED_BUFFERS}
+      DisplayModeRecord{mMode={id=1, width=1920, height=1080, fps=60.000004}}
+    mBaseDisplayInfo=DisplayInfo{"Tela integrada", displayId 0, FLAG_SECURE, FLAG_SUPPORTS_PROTECTED_BUFFERS, FLAG_TRUSTED, real 1920 x 1080, largest app 1920 x 1080, smallest app 1920 x 1080, appVsyncOff 1000000, presDeadline 16666666, mode 1, defaultMode 1, modes [{id=1, width=1920, height=1080, fps=60.000004}], hdrCapabilities HdrCapabilities{mSupportedHdrTypes=[1, 2, 3], mMaxLuminance=500.0, mMaxAverageLuminance=500.0, mMinLuminance=0.0}, minimalPostProcessingSupported false, rotation 0, state ON, type INTERNAL, uniqueId "local:0", app 1920 x 1080, density 320 (3.572 x 1.976) dpi, layerStack 0, colorMode 0, supportedColorModes [0], address {port=0}, deviceProductInfo null, removeMode 0}
+    mOverrideDisplayInfo=DisplayInfo{"Tela integrada", displayId 0, FLAG_SECURE, FLAG_SUPPORTS_PROTECTED_BUFFERS, FLAG_TRUSTED, real 1920 x 1080, largest app 1920 x 1920, smallest app 1080 x 1080, appVsyncOff 1000000, presDeadline 16666666, mode 1, defaultMode 1, modes [{id=1, width=1920, height=1080, fps=60.000004}], hdrCapabilities HdrCapabilities{mSupportedHdrTypes=[1, 2, 3], mMaxLuminance=500.0, mMaxAverageLuminance=500.0, mMinLuminance=0.0}, minimalPostProcessingSupported false, rotation 0, state ON, type INTERNAL, uniqueId "local:0", app 1920 x 1080, density 320 (3.572 x 1.976) dpi, layerStack 0, colorMode 0, supportedColorModes [0], address {port=0}, deviceProductInfo null, removeMode 0}
+## hdr/features
+feature:android.hardware.bluetooth
+feature:android.hardware.bluetooth_le
+feature:android.hardware.hdmi.cec
+feature:android.hardware.ram.normal
+feature:android.hardware.type.television
+feature:android.hardware.wifi
+feature:android.hardware.wifi.direct
+feature:android.software.leanback
+feature:android.software.leanback_only
+## launcher
+  name=app.lume.tv.LumeActivity
+  packageName=app.lume.tv
+## settings
+  name=com.android.tv.settings.MainSettings
+  packageName=com.android.tv.settings
+## packages
+140
+5
+## lume
+    versionCode=200 minSdk=28 targetSdk=36
+    versionName=0.2.0

@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HOME</string>
+    <string name="tagline">beranda Anda di TV</string>
+
+    <!-- Bilah atas -->
+    <string name="tab_home">Beranda</string>
+    <string name="tab_apps">Aplikasi</string>
+
+    <!-- Layar beranda -->
+    <string name="home_favorites_title">Aplikasi favorit Anda</string>
+    <string name="home_add_favorites">Tambah favorit</string>
+
+    <!-- Layar aplikasi -->
+    <string name="apps_title">Semua aplikasi</string>
+
+    <!-- Pengaturan HOME -->
+    <string name="settings_title">Pengaturan</string>
+    <string name="settings_home_screen">Layar beranda</string>
+    <string name="settings_key_mapping">Pemetaan remote</string>
+    <string name="settings_tv_info">Informasi TV</string>
+    <string name="settings_about">Tentang HOME</string>
+
+    <!-- Panel status TV -->
+    <string name="stats_title">STATUS TV</string>
+    <string name="stats_memory">Memori</string>
+    <string name="stats_disk">Penyimpanan</string>
+    <string name="stats_cpu">Clock CPU</string>
+
+    <!-- TV information -->
+    <string name="tv_info_title">Informasi TV</string>
+    <string name="tv_section_device">PERANGKAT</string>
+    <string name="tv_section_processing">PEMROSESAN &amp; GRAFIS</string>
+    <string name="tv_section_memory">MEMORI &amp; PENYIMPANAN</string>
+    <string name="tv_section_system">SISTEM &amp; FIRMWARE</string>
+    <string name="tv_section_display">LAYAR</string>
+    <string name="tv_section_network">JARINGAN</string>
+    <string name="tv_brand">Merek</string>
+    <string name="tv_model">Model</string>
+    <string name="tv_manufacturer">Pabrikan</string>
+    <string name="tv_board">Papan</string>
+    <string name="tv_soc">Prosesor (SoC)</string>
+    <string name="tv_cpu">CPU</string>
+    <string name="tv_cores">Inti</string>
+    <string name="tv_abi">Arsitektur (ABI)</string>
+    <string name="tv_gpu">GPU</string>
+    <string name="tv_opengl">OpenGL ES</string>
+    <string name="tv_ram">Memori (RAM)</string>
+    <string name="tv_memory_profile">Profil memori</string>
+    <string name="tv_storage_total">Penyimpanan internal</string>
+    <string name="tv_storage_free">Penyimpanan kosong</string>
+    <string name="tv_android">Versi Android</string>
+    <string name="tv_api">Level API</string>
+    <string name="tv_firmware">Firmware TV</string>
+    <string name="tv_patch">Patch keamanan</string>
+    <string name="tv_kernel">Kernel Linux</string>
+    <string name="tv_resolution">Resolusi antarmuka</string>
+    <string name="tv_refresh">Kecepatan refresh</string>
+    <string name="tv_density">Kepadatan layar</string>
+    <string name="tv_connection">Koneksi</string>
+    <string name="tv_ip">Alamat IP lokal</string>
+    <string name="tv_profile_standard">Standar</string>
+    <string name="tv_profile_low">RAM rendah</string>
+    <string name="tv_link_wifi">Wi-Fi</string>
+    <string name="tv_link_ethernet">Kabel Ethernet</string>
+    <string name="tv_link_other">Lainnya</string>
+
+    <!-- Tentang -->
+    <string name="about_title">Tentang HOME</string>
+    <string name="about_version">Versi %1$s</string>
+    <string name="about_license">Berlisensi GPL-3.0-or-later</string>
+    <string name="about_source">Kode sumber: %1$s</string>
+    <string name="about_third_party">Lisensi pihak ketiga</string>
+
+    <!-- Editor layar beranda -->
+    <!-- Home screen editor -->
+    <string name="editor_wallpaper">Wallpaper</string>
+    <string name="editor_appearance">Tampilan</string>
+    <string name="wallpaper_cinematic">Teluk pirus</string>
+    <string name="wallpaper_beach_sunset">Pantai senja</string>
+    <string name="wallpaper_beach_dawn">Pantai fajar</string>
+    <string name="wallpaper_aurora">Aurora</string>
+    <string name="wallpaper_mountain_stars">Pegunungan Berbintang</string>
+    <string name="wallpaper_misty_forest">Misty Forest</string>
+    <string name="wallpaper_glass_facade">Fasad Kaca</string>
+    <string name="wallpaper_synthwave_grid">Grid Synthwave</string>
+    <string name="wallpaper_mirror_lake">Mirror Lake</string>
+    <string name="editor_round_favorites">Favorit bulat</string>
+    <string name="editor_breadcrumb_edit">Ubah</string>
+    <string name="editor_title">Ubah layar beranda</string>
+    <string name="editor_done">Selesai</string>
+    <string name="editor_favorites_order">Favorit</string>
+    <string name="editor_favorites_description">Atur urutan aplikasi di dock. Pilih satu lalu gunakan tombol untuk memindahkan atau menghapusnya.</string>
+    <string name="editor_use_arrows">Gunakan panah untuk memindahkan</string>
+    <string name="editor_add_app">Tambah aplikasi:</string>
+    <plurals name="editor_limit_reached">
+        <item quantity="other">Batas %1$d favorit</item>
+    </plurals>
+    <string name="editor_restore_defaults">Pulihkan bawaan</string>
+    <string name="editor_restore_title">Pulihkan layar beranda bawaan?</string>
+    <string name="editor_restore_body">Favorit Anda kembali ke pengaturan awal. Riwayat penggunaan tetap disimpan.</string>
+    <string name="editor_restore_confirm">Pulihkan</string>
+    <string name="editor_cancel">Batal</string>
+
+    <!-- Menu konteks (tombol Menu) -->
+    <string name="menu_add_home">Tambah ke Beranda</string>
+    <string name="menu_remove_home">Hapus dari Beranda</string>
+    <string name="menu_move">Pindahkan</string>
+    <string name="menu_app_info">Info aplikasi</string>
+    <string name="menu_uninstall">Copot pemasangan</string>
+
+    <!-- Pemetaan remote control -->
+    <string name="keymap_title">Pemetaan remote control</string>
+    <string name="keymap_subtitle">Sesuaikan tombol remote untuk perintah HOME, pengaturan TV, dan aplikasi.</string>
+    <string name="keymap_section_commands">Perintah HOME</string>
+    <string name="keymap_section_settings">Pintasan pengaturan</string>
+    <string name="keymap_section_apps">Pintasan aplikasi</string>
+    <string name="command_menu">Menu konteks</string>
+    <string name="command_inputs">Input TV</string>
+    <string name="setting_sleep">Timer Tidur &amp; Daya TV</string>
+    <string name="setting_picture">Gambar &amp; Tampilan TV</string>
+    <string name="setting_sound">Suara &amp; Audio TV</string>
+    <string name="setting_wifi">Jaringan &amp; Wi-Fi</string>
+    <string name="setting_bluetooth">Bluetooth &amp; Remote</string>
+    <string name="setting_apps">Aplikasi Sistem</string>
+    <string name="setting_android">Pengaturan Android</string>
+    <string name="setting_lume_settings">Pengaturan HOME</string>
+    <string name="setting_lume_editor">Edit Layar Beranda</string>
+    <string name="setting_lume_tvinfo">Informasi TV</string>
+    <string name="setting_storage">Penyimpanan</string>
+    <string name="setting_language">Bahasa</string>
+    <string name="setting_datetime">Tanggal &amp; Waktu</string>
+    <string name="setting_keyboard">Keyboard</string>
+    <string name="setting_captions">Teks</string>
+    <string name="setting_location">Lokasi</string>
+    <string name="setting_security">Keamanan &amp; Pembatasan</string>
+    <string name="setting_developer">Opsi Pengembang</string>
+    <string name="setting_home_app">Aplikasi Beranda Default</string>
+    <string name="setting_about">Tentang TV</string>
+    <string name="keymap_add_key">Tambah tombol</string>
+    <string name="keymap_add_setting">Tambah pintasan</string>
+    <string name="keymap_add_app">Tambah aplikasi</string>
+    <string name="keymap_restore_action">Pulihkan default</string>
+    <string name="keymap_remove_action">Hapus pintasan</string>
+    <string name="keymap_restore_defaults">Pulihkan default pabrik</string>
+    <string name="keymap_listening_title">Tekan sebuah tombol</string>
+    <string name="keymap_listening_hint">Kembali untuk batal</string>
+    <string name="keymap_reserved_key_warning">Tombol dicadangkan. Pilih lain atau Kembali.</string>
+    <string name="keymap_listening_for">Untuk: %1$s</string>
+    <string name="keymap_remove_key">Hapus %1$s</string>
+    <string name="keymap_already_default">Sudah default</string>
+    <string name="keymap_pick_app_title">Pilih aplikasi</string>
+    <string name="keymap_pick_app_subtitle">Pilih aplikasi yang akan dibuka tombol</string>
+    <string name="keymap_pick_setting_title">Pilih pintasan</string>
+    <string name="keymap_pick_setting_subtitle">Pilih layar yang akan dibuka tombol</string>
+    <string name="keymap_dialog_restore_title">Pulihkan default pabrik?</string>
+    <string name="keymap_dialog_restore_body">Semua tombol kustom, pintasan pengaturan, dan pintasan aplikasi akan direset ke default pabrik.</string>
+    <string name="key_menu">Menu</string>
+    <string name="key_favorite">Favorit</string>
+    <string name="key_input">Input</string>
+    <string name="key_guide">Panduan</string>
+    <string name="key_info">Info</string>
+    <string name="key_captions">Teks terjemahan</string>
+    <string name="key_tv">TV</string>
+    <string name="key_red">Merah</string>
+    <string name="key_green">Hijau</string>
+    <string name="key_yellow">Kuning</string>
+    <string name="key_blue">Biru</string>
+    <string name="key_channel_up">Saluran +</string>
+    <string name="key_channel_down">Saluran -</string>
+    <string name="key_volume_up">Volume +</string>
+    <string name="key_volume_down">Volume -</string>
+    <string name="key_volume_mute">Hening</string>
+    <string name="key_play_pause">Putar/Jeda</string>
+    <string name="key_stop">Berhenti</string>
+    <string name="key_fast_forward">Maju cepat</string>
+    <string name="key_rewind">Putar balik</string>
+    <string name="key_settings">Pengaturan</string>
+    <string name="key_fallback">Tombol %1$d</string>
+
+    <!-- Pesan -->
+    <string name="toast_app_not_found">Aplikasi tidak ditemukan</string>
+    <string name="toast_key_mapped">Tombol ditetapkan</string>
+
+    <!-- Quick TV controls -->
+    <string name="control_title">Pusat Kontrol</string>
+    <string name="control_wifi">Wi-Fi</string>
+    <string name="control_bluetooth">Bluetooth</string>
+    <string name="control_inputs">Input</string>
+    <string name="control_picture">Gambar</string>
+    <string name="control_sound">Suara</string>
+    <string name="control_ambient">Mode ambient</string>
+    <string name="control_apps">Aplikasi</string>
+    <string name="control_settings">Pengaturan</string>
+</resources>

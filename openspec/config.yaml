@@ -1,0 +1,41 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+# Example:
+#   context: |
+#     Tech stack: TypeScript, React, Node.js
+#     We use conventional commits
+#     Domain: e-commerce platform
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
+
+rules:
+  tasks:
+    - >-
+      O último grupo de tarefas SHALL incluir uma tarefa que revisa a tela Sobre (Configurações do Lume › Sobre o Lume)
+      e a atualiza se a change trouxe algo novo: componente de terceiros (crate, fonte, ícones) e sua licença,
+      endereço do repositório (https://github.com/douglaspands/lume-tv-launcher) ou versão; sem novidade, a tarefa
+      registra "Sobre revisado, sem mudança". Verificar com `cargo run -p lume-desktop -- --screenshot about`.
+    - Nunca escrever IPs da rede do autor nas tarefas; citar as TVs só por nome (a TCL, a AIWA).

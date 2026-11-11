@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        No window animations: lume is the home screen, and the system's enter animation was most of
+        the time between pressing Home and the first frame. The window background is the launcher's
+        own color, so the starting window is not a white or black flash.
+    -->
+    <style name="LumeTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowBackground">@color/lume_background</item>
+    </style>
+
+    <color name="lume_background">#0F171E</color>
+</resources>

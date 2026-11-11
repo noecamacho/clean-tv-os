@@ -1,0 +1,503 @@
+/*
+ * lume default theme.
+ *
+ * Derived from the design mockups (mockup/*.png, drawn @2x on a 1280 px wide canvas).
+ * All lengths are px of the 1280x720 logical canvas. See docs/theme-format.md for
+ * the supported subset. Font weights are limited to 500, 700 and 800, the three
+ * faces that ship with the app.
+ */
+
+:root {
+  /* Surfaces */
+  --bg: #090E19;
+  --surface: #101827;
+  --surface-row: #192334;
+  --surface-focus: #28364B;
+  --surface-icon: #1A252F;
+  --control: #2A3A48;
+  --control-disabled: #1D2A35;
+  --border: #2F4252;
+  --danger-bg: #4A2630;
+  --danger-fg: #FFB4BE;
+
+  /* Text */
+  --text: var(--secondary);
+  --text-soft: #DDE3E8;
+  --text-muted: #AEB9C2;
+  --text-disabled: #59626A;
+
+  /* Roles. The primary color says "this is where the focus is and what you control": the tab
+     underline while the top bar has the focus, the focus outline, the main buttons. The
+     secondary color is the neutral one: text, and the underline when the focus is in the content. */
+  --primary: #EAF4FF;
+  --on-primary: #142033;
+  --secondary: #F7FAFF;
+  /* Old names, kept for themes written before the roles existed. */
+  --accent: var(--primary);
+  --on-accent: var(--on-primary);
+
+  /* Type scale: six even sizes, so the text lands on whole pixels at 1.5x (1080p). Every text
+     component uses one of them; the build warns about any other size. */
+  --font-title: 40px;   /* screen title */
+  --font-brand: 28px;   /* clock in the top bar */
+  --font-primary: 22px; /* tabs, sections, settings items, tiles, editor rows, About headings */
+  --font-body: 20px;    /* base text, About body */
+  --font-label: 18px;   /* buttons, dock bubble, toast, subtitle, breadcrumb, version, tile label, chip, panel */
+  --font-caption: 16px; /* third-party licenses, card headings */
+
+  /* Shape */
+  --radius: 12px;
+  /* Width of the antialiased edge of every shape and clipped image, in pixels of the render buffer
+     (not of the canvas), from 1 to 1.5: wide enough to survive the TV's upscaling and sharpening. */
+  --edge-softness: 1.5px;
+
+  /* Focus */
+  --focus-ring: 4px solid var(--primary);
+  --focus-scale: 1.05;
+  --focus-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --focus-time: 180ms cubic-bezier(0.2, 0, 0, 1);
+
+  /* Context menu: a light card, the one surface that stands out over the dark screens */
+  --menu-surface: #F2F5F7;
+  --menu-text: #1B2630;
+  --menu-text-muted: #5E6A75;
+  /* Danger on the light card (the reserved-key warning, the "Restore" button): 5.97:1 on --menu-surface.
+     --danger-fg is only for dark surfaces. */
+  --menu-danger: #B3261E;
+
+  /* Splash: a neutral loading line appears on --bg while the screen behind it gets ready. */
+  --splash-logo: 128px;
+  --splash-logo-in: 300ms ease-out;
+  /* How long the splash is held from the first frame before the reveal may start (a duration; the
+     curve is unused). */
+  --splash-hold-cold: 600ms linear;
+  --splash-hold-warm: 300ms linear;
+  --splash-status-top: 32px;    /* from the logo's bottom edge */
+  --splash-status-height: 24px;
+  --splash-reveal-cold: 600ms linear;   /* linear: the stages below shape it */
+  --splash-reveal-warm: 360ms linear;
+  --splash-rise: 16px;          /* the content comes up this much while it is revealed */
+  /* An icon that arrives once the interface is on screen fades in over the app's color and initial,
+     instead of popping in. */
+  --icon-in: 150ms ease-out;
+
+  /* Tabs */
+  --tab-underline: 2px;
+
+  /* Tile colors of well-known apps (matched by package name in code) */
+  --brand-netflix: #B3121C;
+  --brand-youtube: #C62828;
+  --brand-prime-video: #145A96;
+  --brand-disney-plus: #1B3A89;
+  --brand-max: #4B2FA8;
+  --brand-spotify: #157A3E;
+  --brand-globoplay: #C2501F;
+  --brand-play-store: #1F2D3B;
+  --brand-chrome: #2B6CB0;
+  --tile-settings: #2A3644;
+  --tile-default: #3E4A5C;
+
+  /* Brand dot shown next to the carousel badge (known apps) */
+  --dot-youtube: #FF4E45;
+}
+
+.app {
+  background: var(--bg);
+  color: var(--text);
+  font-size: var(--font-body);
+  font-weight: 500;
+}
+
+/* Top bar */
+.topbar {
+  height: 88px;
+  padding: 24px 64px 0 64px;
+}
+
+.brand {
+  color: var(--text);
+  font-size: var(--font-brand);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.tab {
+  color: var(--text-muted);
+  font-size: var(--font-primary);
+  font-weight: 500;
+  transition: var(--focus-time);
+}
+.tab:active {
+  color: var(--text);
+  font-weight: 700;
+}
+.tab:focus {
+  color: var(--text);
+}
+
+/* The clock has the wordmark's height and the stroke of the tab text: at 28, weight 500 has the
+   stem that 22 has at 700. */
+.clock {
+  color: var(--text);
+  font-size: var(--font-brand);
+  font-weight: 500;
+}
+
+.icon-button {
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  background: rgba(0, 0, 0, 0);
+  color: var(--text);
+  transition: var(--focus-time);
+}
+.icon-button:focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  transform: scale(1.08);
+}
+.icon-button:disabled {
+  background: var(--control-disabled);
+  color: var(--text-disabled);
+}
+
+/* Buttons. The primary one is the action of the screen: faded like an inactive tab until it has the
+   focus, then filled with the primary color (its blue focus ring stands off the fill by 4px, so it
+   reads against the dark background like every other focus ring). The secondary one is the quiet alternative; the danger one confirms what cannot be
+   undone. */
+.button {
+  height: 48px;
+  padding: 0 28px;
+  gap: 8px;
+  border-radius: var(--radius);
+  background: var(--control);
+  color: var(--text-muted);
+  font-size: var(--font-label);
+  font-weight: 700;
+  transition: var(--focus-time);
+}
+.button:focus {
+  background: var(--primary);
+  color: var(--on-primary);
+  outline: 3px solid var(--primary);
+  outline-offset: 4px;
+  transform: scale(1.04);
+}
+.button:disabled {
+  opacity: 0.4;
+}
+
+.button-secondary {
+  height: 48px;
+  padding: 0 28px;
+  gap: 8px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  outline: 2px solid var(--border);
+  color: var(--text);
+  font-size: var(--font-label);
+  font-weight: 700;
+  transition: var(--focus-time);
+}
+.button-secondary:focus {
+  background: var(--surface-focus);
+  outline: 3px solid var(--primary);
+  outline-offset: 0px;
+  transform: scale(1.04);
+}
+.button-secondary:disabled {
+  opacity: 0.4;
+}
+
+.button-danger {
+  height: 48px;
+  padding: 0 28px;
+  gap: 8px;
+  border-radius: var(--radius);
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+  font-size: var(--font-label);
+  font-weight: 700;
+  transition: var(--focus-time);
+}
+.button-danger:focus {
+  outline: 3px solid var(--primary);
+  outline-offset: 4px;
+  transform: scale(1.04);
+}
+.button-danger:disabled {
+  opacity: 0.4;
+}
+
+/* Dock: the favorites on the Home screen. Item sizes and spacing are fixed in the code. */
+.dock {
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(241, 249, 255, 0.24) 0%, rgba(193, 218, 243, 0.10) 42%, rgba(115, 153, 195, 0.16) 100%);
+  outline: 1px solid rgba(255, 255, 255, 0.48);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.52);
+}
+
+/* The name of the focused dock item, in a bubble above it */
+.dock-label {
+  padding: 8px 16px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0);
+  color: var(--text);
+  font-size: var(--font-label);
+  font-weight: 700;
+}
+
+/* Rows and tiles */
+.section-title {
+  color: var(--text);
+  font-size: var(--font-primary);
+  font-weight: 700;
+}
+
+.tile {
+  width: 172px;
+  height: 97px;
+  border-radius: var(--radius);
+  color: #FFFFFF;
+  font-size: var(--font-primary);
+  font-weight: 700;
+  transition: 260ms cubic-bezier(0.2, 0, 0, 1);
+}
+/* tvOS: the focused icon lifts over a wide soft shadow, with a light rim instead of a ring. */
+.tile:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 0px;
+  transform: scale(1.12);
+  box-shadow: 0 22px 44px rgba(0, 0, 0, 0.55);
+}
+
+.tile-label {
+  color: var(--text-muted);
+  font-size: var(--font-label);
+  font-weight: 500;
+}
+
+/* The name under the focused tile behaves like the active tab: white and bold. */
+.tile-label {
+  transition: var(--focus-time);
+}
+.tile-label:focus {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* Settings */
+.settings-item {
+  height: 72px;
+  padding: 0 28px;
+  gap: 16px;
+  border-radius: var(--radius);
+  background: var(--surface-row);
+  color: var(--text-muted);
+  font-size: var(--font-primary);
+  font-weight: 700;
+  transition: var(--focus-time);
+}
+/* Like the primary button: faded until it has the focus, then it lights up. */
+.settings-item:focus {
+  background: var(--primary);
+  color: var(--on-primary);
+  outline: 3px solid var(--primary);
+  outline-offset: 4px;
+}
+
+/* Context menu (the Menu button): a light card next to the item it belongs to, like the system
+   launcher's, so it does not blend into the dark screens. Its items are dark text until they have
+   the focus, then they are filled with the primary color, without a ring: on the light card the
+   fill alone marks the focus. A disabled item says why in a .menu-note. */
+.menu {
+  border-radius: 20px;
+  background: var(--menu-surface);
+  /* Close to the card and all around it, so the light card stands apart from a white tile. */
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+}
+
+.menu-item {
+  height: 56px;
+  /* With the card's 8, the text starts 24 from its edge. */
+  padding: 0 16px;
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0);
+  color: var(--menu-text);
+  /* The size and weight of the app names: at 20/700 the dark text on the light card read heavy. */
+  font-size: var(--font-label);
+  font-weight: 500;
+  transition: var(--focus-time);
+}
+.menu-item:focus {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.menu-item:disabled {
+  color: var(--menu-text-muted);
+  opacity: 0.6;
+}
+
+.menu-note {
+  color: var(--menu-text-muted);
+  font-size: var(--font-caption);
+  font-weight: 500;
+}
+
+/* The buttons of a dialog drawn on the light card: an outline and dark text until they have the
+   focus, then the primary fill with no ring (like .menu-item). The danger one confirms what cannot
+   be undone. */
+.menu-button {
+  height: 48px;
+  padding: 0 28px;
+  border-radius: var(--radius);
+  outline: 2px solid var(--menu-text-muted);
+  color: var(--menu-text);
+  font-size: var(--font-label);
+  font-weight: 700;
+  transition: var(--focus-time);
+}
+.menu-button:focus {
+  background: var(--primary);
+  outline: none;
+  color: var(--on-primary);
+}
+
+.menu-button-danger {
+  height: 48px;
+  padding: 0 28px;
+  border-radius: var(--radius);
+  outline: 2px solid var(--menu-danger);
+  color: var(--menu-danger);
+  font-size: var(--font-label);
+  font-weight: 700;
+  transition: var(--focus-time);
+}
+.menu-button-danger:focus {
+  background: var(--primary);
+  outline: none;
+  color: var(--on-primary);
+}
+
+.breadcrumb {
+  color: var(--text-muted);
+  font-size: var(--font-label);
+  font-weight: 500;
+}
+.breadcrumb:active {
+  color: var(--text);
+}
+
+/* Screen header (secondary screens): title and subtitle under the breadcrumb */
+.page-title {
+  color: var(--text);
+  font-size: var(--font-title);
+  font-weight: 800;
+  letter-spacing: -0.8px;
+}
+
+.page-subtitle {
+  color: var(--text-muted);
+  font-size: var(--font-label);
+  font-weight: 500;
+}
+
+/* The uppercase heading inside a card (TV statistics, favorites order) */
+.card-heading {
+  color: var(--text-muted);
+  font-size: var(--font-caption);
+  font-weight: 800;
+  letter-spacing: 1.2px;
+}
+
+/* About screen */
+.about-heading {
+  color: var(--text);
+  font-size: var(--font-primary);
+  font-weight: 700;
+}
+
+.about-body {
+  color: var(--text-muted);
+  font-size: var(--font-body);
+  font-weight: 500;
+}
+
+.about-license {
+  color: var(--text-muted);
+  font-size: var(--font-caption);
+  font-weight: 500;
+}
+
+/* Home editor */
+.editor-row {
+  height: 64px;
+  padding: 0 24px;
+  gap: 16px;
+  border-radius: var(--radius);
+  background: var(--surface-row);
+  color: var(--text);
+  font-size: var(--font-primary);
+  font-weight: 700;
+  transition: var(--focus-time);
+}
+.editor-row:focus {
+  background: var(--surface-focus);
+  outline: var(--focus-ring);
+  outline-offset: 0px;
+}
+
+.keycap {
+  height: 40px;
+  padding: 0 16px;
+  gap: 8px;
+  border-radius: 20px;
+  background: var(--control);
+  color: var(--text);
+  font-size: var(--font-label);
+  font-weight: 700;
+}
+
+.panel {
+  padding: 16px 32px;
+  gap: 16px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: var(--font-label);
+  font-weight: 500;
+}
+
+.chip {
+  height: 40px;
+  padding: 0 16px;
+  gap: 8px;
+  border-radius: 20px;
+  background: var(--control);
+  color: var(--text);
+  font-size: var(--font-label);
+  font-weight: 700;
+  transition: var(--focus-time);
+}
+.chip:active {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.chip:focus {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+.chip:disabled {
+  opacity: 0.4;
+}
+
+/* Transient message */
+.toast {
+  padding: 12px 20px;
+  border-radius: var(--radius);
+  background: var(--surface-focus);
+  color: var(--text);
+  font-size: var(--font-label);
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}

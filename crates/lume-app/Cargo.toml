@@ -1,0 +1,24 @@
+[package]
+name = "lume-app"
+description = "Android app of lume (NativeActivity + EGL + JNI)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "lume"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+lume-core = { path = "../lume-core" }
+lume-version = { path = "../lume-version" }
+log = "0.4"
+
+[target.'cfg(target_os = "android")'.dependencies]
+android-activity = { version = "0.6", features = ["native-activity"] }
+android_logger = "0.15"
+glow = { version = "0.18", default-features = false }
+jni = "0.22"
+khronos-egl = { version = "6", features = ["dynamic"] }
+libc = "0.2"
+ndk = "0.9"

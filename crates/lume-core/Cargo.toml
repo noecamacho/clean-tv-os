@@ -1,0 +1,23 @@
+[package]
+name = "lume-core"
+description = "Platform-independent lume logic: layout, focus, state, theme and i18n"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+lume-version = { path = "../lume-version" }
+glow = { version = "0.18", default-features = false }
+log = "0.4"
+memmap2 = "0.9"
+miniz_oxide = { version = "0.8", default-features = false, features = ["with-alloc"] }
+qoi = "0.4"
+ttf-parser = { version = "0.25", default-features = false, features = ["std", "opentype-layout"] }
+bytemuck = { version = "1", features = ["derive"] }
+fontdue = { version = "0.9", default-features = false, features = ["hashbrown"] }
+
+[build-dependencies]
+lume-css = { path = "../lume-css" }
+lume-strings = { path = "../lume-strings" }
+miniz_oxide = { version = "0.8" }

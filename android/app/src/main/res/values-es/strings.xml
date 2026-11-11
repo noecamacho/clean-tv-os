@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HOME</string>
+    <string name="tagline">tu inicio en la TV</string>
+
+    <!-- Barra superior -->
+    <string name="tab_home">Inicio</string>
+    <string name="tab_apps">Apps</string>
+
+    <!-- Pantalla de inicio -->
+    <string name="home_favorites_title">Tus apps favoritas</string>
+    <string name="home_add_favorites">Añadir favoritas</string>
+
+    <!-- Pantalla de apps -->
+    <string name="apps_title">Todas las apps</string>
+
+    <!-- Ajustes de HOME -->
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_home_screen">Pantalla de inicio</string>
+    <string name="settings_key_mapping">Mapeo de control</string>
+    <string name="settings_tv_info">Información del televisor</string>
+    <string name="settings_about">Acerca de HOME</string>
+
+    <!-- Panel de estado de la TV -->
+    <string name="stats_title">ESTADO DE LA TV</string>
+    <string name="stats_memory">Memoria</string>
+    <string name="stats_disk">Almacenamiento</string>
+    <string name="stats_cpu">Reloj de CPU</string>
+
+    <!-- TV information -->
+    <string name="tv_info_title">Información del televisor</string>
+    <string name="tv_section_device">DISPOSITIVO</string>
+    <string name="tv_section_processing">PROCESAMIENTO Y GRÁFICOS</string>
+    <string name="tv_section_memory">MEMORIA Y ALMACENAMIENTO</string>
+    <string name="tv_section_system">SISTEMA Y FIRMWARE</string>
+    <string name="tv_section_display">PANTALLA</string>
+    <string name="tv_section_network">RED</string>
+    <string name="tv_brand">Marca</string>
+    <string name="tv_model">Modelo</string>
+    <string name="tv_manufacturer">Fabricante</string>
+    <string name="tv_board">Placa</string>
+    <string name="tv_soc">Procesador (SoC)</string>
+    <string name="tv_cpu">CPU</string>
+    <string name="tv_cores">Núcleos</string>
+    <string name="tv_abi">Arquitectura (ABI)</string>
+    <string name="tv_gpu">GPU</string>
+    <string name="tv_opengl">OpenGL ES</string>
+    <string name="tv_ram">Memoria (RAM)</string>
+    <string name="tv_memory_profile">Perfil de memoria</string>
+    <string name="tv_storage_total">Almacenamiento interno</string>
+    <string name="tv_storage_free">Almacenamiento libre</string>
+    <string name="tv_android">Versión de Android</string>
+    <string name="tv_api">Nivel de API</string>
+    <string name="tv_firmware">Firmware del televisor</string>
+    <string name="tv_patch">Parche de seguridad</string>
+    <string name="tv_kernel">Kernel de Linux</string>
+    <string name="tv_resolution">Resolución de la interfaz</string>
+    <string name="tv_refresh">Frecuencia de actualización</string>
+    <string name="tv_density">Densidad de pantalla</string>
+    <string name="tv_connection">Conexión</string>
+    <string name="tv_ip">Dirección IP local</string>
+    <string name="tv_profile_standard">Estándar</string>
+    <string name="tv_profile_low">Poca RAM</string>
+    <string name="tv_link_wifi">Wi-Fi</string>
+    <string name="tv_link_ethernet">Cable Ethernet</string>
+    <string name="tv_link_other">Otra</string>
+
+    <!-- Acerca de -->
+    <string name="about_title">Acerca de HOME</string>
+    <string name="about_version">Versión %1$s</string>
+    <string name="about_license">Licencia GPL-3.0-or-later</string>
+    <string name="about_source">Código fuente: %1$s</string>
+    <string name="about_third_party">Licencias de terceros</string>
+
+    <!-- Editor de la pantalla de inicio -->
+    <!-- Home screen editor -->
+    <string name="editor_wallpaper">Fondo de pantalla</string>
+    <string name="editor_appearance">Apariencia</string>
+    <string name="wallpaper_cinematic">Cala turquesa</string>
+    <string name="wallpaper_beach_sunset">Playa al atardecer</string>
+    <string name="wallpaper_beach_dawn">Playa al amanecer</string>
+    <string name="wallpaper_aurora">Aurora</string>
+    <string name="wallpaper_mountain_stars">Montañas Estrelladas</string>
+    <string name="wallpaper_misty_forest">Bosque Nocturno</string>
+    <string name="wallpaper_glass_facade">Fachada de Cristal</string>
+    <string name="wallpaper_synthwave_grid">Cuadrícula Synthwave</string>
+    <string name="wallpaper_mirror_lake">Lago Espejo</string>
+    <string name="editor_round_favorites">Favoritas redondas</string>
+    <string name="editor_breadcrumb_edit">Editar</string>
+    <string name="editor_title">Editar pantalla de inicio</string>
+    <string name="editor_done">Listo</string>
+    <string name="editor_favorites_order">Favoritos</string>
+    <string name="editor_favorites_description">Define el orden de las apps en el dock. Selecciona una y usa los botones para moverla o quitarla.</string>
+    <string name="editor_use_arrows">Usa las flechas para mover</string>
+    <string name="editor_add_app">Añadir app:</string>
+    <plurals name="editor_limit_reached">
+        <item quantity="one">Límite de %1$d favorita</item>
+        <item quantity="other">Límite de %1$d favoritas</item>
+    </plurals>
+    <string name="editor_restore_defaults">Restablecer</string>
+    <string name="editor_restore_title">¿Restablecer la pantalla de inicio predeterminada?</string>
+    <string name="editor_restore_body">Tus favoritas vuelven a la configuración inicial. Se conserva tu historial de uso.</string>
+    <string name="editor_restore_confirm">Restablecer</string>
+    <string name="editor_cancel">Cancelar</string>
+
+    <!-- Menú contextual (botón Menú) -->
+    <string name="menu_add_home">Añadir a Inicio</string>
+    <string name="menu_remove_home">Quitar de Inicio</string>
+    <string name="menu_move">Mover</string>
+    <string name="menu_app_info">Información de la app</string>
+    <string name="menu_uninstall">Desinstalar</string>
+
+    <!-- Mapeo de control remoto -->
+    <string name="keymap_title">Mapeo de control remoto</string>
+    <string name="keymap_subtitle">Personaliza botones del control para comandos de HOME, ajustes de TV y apps.</string>
+    <string name="keymap_section_commands">Comandos de HOME</string>
+    <string name="keymap_section_settings">Atajos de ajustes</string>
+    <string name="keymap_section_apps">Atajos de aplicaciones</string>
+    <string name="command_menu">Menú contextual</string>
+    <string name="command_inputs">Entradas de TV</string>
+    <string name="setting_sleep">Temporizador / Sleep y Energía de TV</string>
+    <string name="setting_picture">Imagen y Pantalla de TV</string>
+    <string name="setting_sound">Sonido y Audio de TV</string>
+    <string name="setting_wifi">Red y Wi-Fi</string>
+    <string name="setting_bluetooth">Bluetooth y Controles</string>
+    <string name="setting_apps">Aplicaciones del Sistema</string>
+    <string name="setting_android">Ajustes de Android</string>
+    <string name="setting_lume_settings">Ajustes de HOME</string>
+    <string name="setting_lume_editor">Editar Pantalla de Inicio</string>
+    <string name="setting_lume_tvinfo">Información de la TV</string>
+    <string name="setting_storage">Almacenamiento</string>
+    <string name="setting_language">Idioma</string>
+    <string name="setting_datetime">Fecha y hora</string>
+    <string name="setting_keyboard">Teclado</string>
+    <string name="setting_captions">Subtítulos</string>
+    <string name="setting_location">Ubicación</string>
+    <string name="setting_security">Seguridad y restricciones</string>
+    <string name="setting_developer">Opciones de desarrollador</string>
+    <string name="setting_home_app">App de inicio predeterminada</string>
+    <string name="setting_about">Acerca del televisor</string>
+    <string name="keymap_add_key">Añadir tecla</string>
+    <string name="keymap_add_setting">Añadir atajo</string>
+    <string name="keymap_add_app">Añadir aplicación</string>
+    <string name="keymap_restore_action">Restaurar valor de fábrica</string>
+    <string name="keymap_remove_action">Eliminar atajo</string>
+    <string name="keymap_restore_defaults">Restaurar valores de fábrica</string>
+    <string name="keymap_listening_title">Presione una tecla</string>
+    <string name="keymap_listening_hint">Volver para cancelar</string>
+    <string name="keymap_reserved_key_warning">Tecla reservada. Elija otra, o Volver para cancelar.</string>
+    <string name="keymap_listening_for">Para: %1$s</string>
+    <string name="keymap_remove_key">Eliminar %1$s</string>
+    <string name="keymap_already_default">Ya es el valor de fábrica</string>
+    <string name="keymap_pick_app_title">Elegir aplicación</string>
+    <string name="keymap_pick_app_subtitle">Elija la aplicación que abrirá la tecla</string>
+    <string name="keymap_pick_setting_title">Elegir atajo</string>
+    <string name="keymap_pick_setting_subtitle">Elija la pantalla que abrirá la tecla</string>
+    <string name="keymap_dialog_restore_title">¿Restaurar el valor de fábrica?</string>
+    <string name="keymap_dialog_restore_body">Todas las teclas personalizadas, atajos de ajustes y de aplicaciones volverán a los valores de fábrica.</string>
+    <string name="key_menu">Menú</string>
+    <string name="key_favorite">Favorito</string>
+    <string name="key_input">Entrada</string>
+    <string name="key_guide">Guía</string>
+    <string name="key_info">Info</string>
+    <string name="key_captions">Subtítulos</string>
+    <string name="key_tv">TV</string>
+    <string name="key_red">Rojo</string>
+    <string name="key_green">Verde</string>
+    <string name="key_yellow">Amarillo</string>
+    <string name="key_blue">Azul</string>
+    <string name="key_channel_up">Canal +</string>
+    <string name="key_channel_down">Canal -</string>
+    <string name="key_volume_up">Volumen +</string>
+    <string name="key_volume_down">Volumen -</string>
+    <string name="key_volume_mute">Silencio</string>
+    <string name="key_play_pause">Reproducir/Pausar</string>
+    <string name="key_stop">Detener</string>
+    <string name="key_fast_forward">Avance rápido</string>
+    <string name="key_rewind">Rebobinar</string>
+    <string name="key_settings">Ajustes</string>
+    <string name="key_fallback">Tecla %1$d</string>
+
+    <!-- Mensajes -->
+    <string name="toast_app_not_found">App no encontrada</string>
+    <string name="toast_key_mapped">Tecla asignada</string>
+
+    <!-- Quick TV controls -->
+    <string name="control_title">Centro de control</string>
+    <string name="control_wifi">Wi-Fi</string>
+    <string name="control_bluetooth">Bluetooth</string>
+    <string name="control_inputs">Entradas</string>
+    <string name="control_picture">Imagen</string>
+    <string name="control_sound">Sonido</string>
+    <string name="control_ambient">Modo ambiente</string>
+    <string name="control_apps">Apps</string>
+    <string name="control_settings">Ajustes</string>
+</resources>

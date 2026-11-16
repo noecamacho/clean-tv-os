@@ -2,7 +2,7 @@
 
 ## Estado antes de iniciar cambios
 
-El trabajo vive en `noecamacho/clean-tv-os`; los cambios de 0.5.0 a 0.9.7 se subieron en la rama `tvos-0.9.7`. El APK de `dist/` no se versiona. No hagas commit o push sin que el usuario lo solicite.
+El trabajo vive en `main` de `noecamacho/clean-tv-os`. El APK de `dist/` no se versiona. No hagas commit o push sin que el usuario lo solicite.
 
 ## Pendientes verificables (a 2026-11-16, HOME 0.9.7)
 

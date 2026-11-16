@@ -272,18 +272,7 @@ impl TopBar<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::tests::Rig;
-    use crate::app::Key;
     use crate::text::TextEngine;
-
-    #[test]
-    fn navigation_reveals_a_glass_bar_behind_the_controls() {
-        let mut rig = Rig::new();
-        rig.press(Key::Up);
-        assert!(rig.frame().cmds().iter().any(|cmd| {
-            matches!(cmd, crate::render::Cmd::Glass(glass) if glass.dest == GLASS_BAR)
-        }));
-    }
 
     #[test]
     fn the_layout_is_on_the_ruler() {

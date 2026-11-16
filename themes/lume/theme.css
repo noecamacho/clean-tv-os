@@ -10,8 +10,8 @@
 :root {
   /* Surfaces */
   --bg: #090E19;
-  --surface: #101827;
-  --surface-row: #192334;
+  --surface: rgba(14, 20, 30, 0.62);
+  --surface-row: rgba(255, 255, 255, 0.08);
   --surface-focus: #28364B;
   --surface-icon: #1A252F;
   --control: #2A3A48;
@@ -58,24 +58,24 @@
   --focus-time: 180ms cubic-bezier(0.2, 0, 0, 1);
 
   /* Context menu: a light card, the one surface that stands out over the dark screens */
-  --menu-surface: #F2F5F7;
-  --menu-text: #1B2630;
-  --menu-text-muted: #5E6A75;
+  --menu-surface: rgba(22, 28, 38, 0.90);
+  --menu-text: #F7FAFF;
+  --menu-text-muted: #AEB9C2;
   /* Danger on the light card (the reserved-key warning, the "Restore" button): 5.97:1 on --menu-surface.
      --danger-fg is only for dark surfaces. */
-  --menu-danger: #B3261E;
+  --menu-danger: #FFB4BE;
 
   /* Splash: a neutral loading line appears on --bg while the screen behind it gets ready. */
   --splash-logo: 128px;
   --splash-logo-in: 300ms ease-out;
   /* How long the splash is held from the first frame before the reveal may start (a duration; the
      curve is unused). */
-  --splash-hold-cold: 600ms linear;
+  --splash-hold-cold: 300ms linear;
   --splash-hold-warm: 300ms linear;
   --splash-status-top: 32px;    /* from the logo's bottom edge */
   --splash-status-height: 24px;
-  --splash-reveal-cold: 600ms linear;   /* linear: the stages below shape it */
-  --splash-reveal-warm: 360ms linear;
+  --splash-reveal-cold: 360ms linear;   /* linear: the stages below shape it */
+  --splash-reveal-warm: 180ms linear;
   --splash-rise: 16px;          /* the content comes up this much while it is revealed */
   /* An icon that arrives once the interface is on screen fades in over the app's color and initial,
      instead of popping in. */
@@ -179,9 +179,8 @@
 .button:focus {
   background: var(--primary);
   color: var(--on-primary);
-  outline: 3px solid var(--primary);
-  outline-offset: 4px;
   transform: scale(1.04);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.40);
 }
 .button:disabled {
   opacity: 0.4;
@@ -200,10 +199,11 @@
   transition: var(--focus-time);
 }
 .button-secondary:focus {
-  background: var(--surface-focus);
-  outline: 3px solid var(--primary);
-  outline-offset: 0px;
+  background: var(--primary);
+  color: var(--on-primary);
+  outline: none;
   transform: scale(1.04);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.40);
 }
 .button-secondary:disabled {
   opacity: 0.4;
@@ -390,10 +390,9 @@
 
 /* Screen header (secondary screens): title and subtitle under the breadcrumb */
 .page-title {
-  color: var(--text);
-  font-size: var(--font-title);
-  font-weight: 800;
-  letter-spacing: -0.8px;
+  color: rgba(255, 255, 255, 0.67);
+  font-size: var(--font-brand);
+  font-weight: 700;
 }
 
 .page-subtitle {
@@ -441,10 +440,11 @@
   font-weight: 700;
   transition: var(--focus-time);
 }
+/* tvOS: the row with the focus turns white with dark content, over a shadow, without a ring. */
 .editor-row:focus {
-  background: var(--surface-focus);
-  outline: var(--focus-ring);
-  outline-offset: 0px;
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.40);
 }
 
 .keycap {
@@ -493,9 +493,9 @@
 
 /* Transient message */
 .toast {
-  padding: 12px 20px;
-  border-radius: var(--radius);
-  background: var(--surface-focus);
+  padding: 12px 24px;
+  border-radius: 24px;
+  background: var(--menu-surface);
   color: var(--text);
   font-size: var(--font-label);
   font-weight: 500;

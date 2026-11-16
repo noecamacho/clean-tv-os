@@ -20,6 +20,11 @@
     <string name="settings_key_mapping">Pemetaan remote</string>
     <string name="settings_tv_info">Informasi TV</string>
     <string name="settings_about">Tentang HOME</string>
+    <string name="settings_wallpaper">Wallpaper</string>
+    <string name="settings_tv_section">Setelan TV</string>
+    <string name="settings_network">Jaringan</string>
+    <string name="settings_home_order">Baris utama dan urutan</string>
+    <string name="settings_all">Semua setelan</string>
 
     <!-- Panel status TV -->
     <string name="stats_title">STATUS TV</string>
@@ -80,17 +85,17 @@
     <string name="wallpaper_beach_sunset">Pantai senja</string>
     <string name="wallpaper_beach_dawn">Pantai fajar</string>
     <string name="wallpaper_aurora">Aurora</string>
-    <string name="wallpaper_mountain_stars">Pegunungan Berbintang</string>
-    <string name="wallpaper_misty_forest">Misty Forest</string>
+    <string name="wallpaper_mountain_stars">Lembah pegunungan</string>
+    <string name="wallpaper_misty_forest">Hutan berkabut</string>
     <string name="wallpaper_glass_facade">Fasad Kaca</string>
-    <string name="wallpaper_synthwave_grid">Grid Synthwave</string>
-    <string name="wallpaper_mirror_lake">Mirror Lake</string>
-    <string name="editor_round_favorites">Favorit bulat</string>
+    <string name="wallpaper_synthwave_grid">Gunung saat senja</string>
+    <string name="wallpaper_mirror_lake">Kastil berkabut</string>
+    <string name="editor_six_columns">Enam ikon per baris</string>
     <string name="editor_breadcrumb_edit">Ubah</string>
     <string name="editor_title">Ubah layar beranda</string>
     <string name="editor_done">Selesai</string>
     <string name="editor_favorites_order">Favorit</string>
-    <string name="editor_favorites_description">Atur urutan aplikasi di dock. Pilih satu lalu gunakan tombol untuk memindahkan atau menghapusnya.</string>
+    <string name="editor_favorites_description">Atur urutan aplikasi di baris utama. Pilih satu lalu gunakan tombol untuk memindahkan atau menghapusnya.</string>
     <string name="editor_use_arrows">Gunakan panah untuk memindahkan</string>
     <string name="editor_add_app">Tambah aplikasi:</string>
     <plurals name="editor_limit_reached">
@@ -190,6 +195,15 @@
     <string name="control_picture">Gambar</string>
     <string name="control_sound">Suara</string>
     <string name="control_ambient">Mode ambient</string>
+    <string name="control_sleep_now">Tidur</string>
+    <string name="control_brightness">Kecerahan</string>
+    <string name="control_volume">Volume</string>
+    <string name="control_timer">Timer tidur</string>
+    <string name="control_timer_off">Nonaktif</string>
+    <string name="control_on">Aktif</string>
+    <string name="control_auto">Otomatis</string>
+    <string name="control_mirror">Pencerminan layar</string>
+    <string name="control_airplay">AirPlay</string>
     <string name="control_apps">Aplikasi</string>
     <string name="control_settings">Pengaturan</string>
 </resources>

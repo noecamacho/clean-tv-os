@@ -19,6 +19,9 @@
          a socket is the only way left to list the network interfaces (the TV information screen's
          connection and address). Lume never opens a connection. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The brightness slider of the Control Center. Granted by hand: adb shell appops set
+         app.lume.tv WRITE_SETTINGS allow. -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
 
     <!-- App visibility through intent queries; no QUERY_ALL_PACKAGES. -->
     <queries>
@@ -51,6 +54,10 @@
         android:hasCode="true"
         android:allowBackup="false"
         android:theme="@style/LumeTheme">
+
+        <!-- TCL's picture library, where this brand keeps the panel's backlight: Android's own
+             brightness setting does not reach the panel on these TVs. -->
+        <uses-library android:name="com.tcl.tv.display" android:required="false" />
 
         <activity
             android:name=".LumeActivity"

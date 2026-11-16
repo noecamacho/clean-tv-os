@@ -12,6 +12,8 @@ PAGES = [
     "operations.md",
     "references.md",
     "next-work.md",
+    "tvos-hig.md",
+    "tcl-apis.md",
 ]
 
 

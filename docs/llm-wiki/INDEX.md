@@ -1,6 +1,6 @@
 # Wiki LLM · HOME
 
-Esta wiki es el contexto de trabajo para otros agentes. Se compiló el 11 de noviembre de 2026 a partir del código local, las specs y las pruebas en la TCL; no sustituye la lectura del código cuando se cambia una función.
+Esta wiki es el contexto de trabajo para otros agentes. Se actualizó el 16 de noviembre de 2026 (HOME 0.9.7) a partir del código local, las specs y las pruebas en la TCL; no sustituye la lectura del código cuando se cambia una función.
 
 ## Ruta de lectura
 
@@ -10,6 +10,8 @@ Esta wiki es el contexto de trabajo para otros agentes. Se compiló el 11 de nov
 4. [Dispositivo y operaciones](operations.md): compilar, instalar, probar, recuperar.
 5. [Referencias y procedencia](references.md): Lume, TV Home, artículo de AppleInsider, licencias.
 6. [Pendientes y guía de colaboración](next-work.md): riesgos, decisiones abiertas y pruebas futuras.
+7. [Guía de diseño de tvOS (HIG)](tvos-hig.md): lo que Apple publica, diferencias con HOME y lista priorizada de cambios. Estudiada el 2026-11-11; los vídeos solo por transcripción.
+8. [APIs de TCL y Realtek en la 55Q5K](tcl-apis.md): librerías del fabricante que una app puede cargar, sus clases y métodos, y los límites. Úsala antes de dar por imposible un control de la tele.
 
 ## Fuentes de verdad
 

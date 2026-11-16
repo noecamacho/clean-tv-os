@@ -9,7 +9,9 @@
 | Ruta | Responsabilidad |
 | --- | --- |
 | `crates/lume-core/src/app/` | Estado de pantallas, D-pad, focus, Home, Apps, Centro de control, ajustes y menús. |
-| `app/home.rs`, `app/apps.rs`, `app/topbar.rs` | Diseño del estante, cuadrícula y barra superior. |
+| `app/home.rs` | Inicio en dos estados (fila principal en reposo, biblioteca desplegada). `app/apps.rs` y `app/topbar.rs` son heredados y ya no tienen entrada desde la interfaz. |
+| `app/control_center.rs`, `app/settings.rs` | Centro de control (deslizadores, temporizador) y Ajustes con estructura de tvOS (`SettingsPage`). |
+| `lume-app/src/android/egl.rs`, `vulkan.rs` | `Graphics`: OpenGL ES por defecto, conservado al salir (`park`/`resume`); Vulkan 1.3 opcional. |
 | `app/control_center.rs` | Panel de vidrio, tarjetas y efectos de accesos directos. |
 | `app/painter.rs`, `render/gles2.rs`, `render/shaders.rs` | Comandos de dibujo, textura del fondo y GLES2. |
 | `ui/animation.rs`, `display.rs`, `shell/` | Animaciones, escala de 1280×720 y bucle de render. |
@@ -25,6 +27,6 @@
 
 - Mantén el `applicationId` `app.lume.tv` y la misma clave de firma si el objetivo es actualizar la app ya instalada y conservar preferencias. Renombrar paquete o firma requiere migración explícita.
 - Usa los efectos existentes (`OpenTvSetting`, `OpenInputs`, `OpenAndroidSettings`) para abrir paneles del sistema. No implementes conjeturas de toggles privilegiados.
-- El foco del Centro de control se calcula por fila y columna; Back vuelve a la pestaña anterior y deja enfocado el botón de control.
+- El foco del Centro de control se calcula por fila y columna; Back lo cierra y devuelve el foco a lo que lo tenía.
 - La app evita animación continua en reposo. El bucle duerme cuando no hay cambio visual; no agregues blur o pasadas a pantalla completa sin medir en la TCL.
 - Las specs de `openspec/specs/` deben registrar una capacidad nueva; el directorio `docs/upstream/` no es especificación de HOME.

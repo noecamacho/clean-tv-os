@@ -1,8 +1,8 @@
 # HOME · clean-tv-os
 
-Launcher personal para Android TV, escrito principalmente en Rust y OpenGL ES 2.0. Esta variante para la TCL 55Q5K usa fondos de playa originales, una interfaz inspirada en tvOS 26 y un Centro de control con accesos a funciones compatibles de la TV.
+Launcher personal para Android TV, escrito principalmente en Rust y OpenGL ES. Esta variante para la TCL 55Q5K usa fondos de playa originales, una interfaz inspirada en tvOS 26 y un Centro de control con accesos a funciones compatibles de la TV.
 
-**Estado:** versión 0.4.0, probada en la TCL 55Q5K a 1920×1080 y 60 cuadros por segundo. Google TV sigue siendo el launcher del sistema; un servicio de accesibilidad opcional hace que el botón Home abra HOME. Cambios en [CHANGELOG.md](CHANGELOG.md).
+**Estado:** versión 0.9.7, probada en la TCL 55Q5K a 1920×1080 y 60 cuadros por segundo. Google TV sigue siendo el launcher del sistema; un servicio de accesibilidad opcional hace que el botón Home abra HOME. Cambios en [CHANGELOG.md](CHANGELOG.md).
 
 ## Para continuar el proyecto
 

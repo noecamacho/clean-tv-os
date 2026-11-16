@@ -12,7 +12,7 @@ members = [
 [workspace.package]
 # Not the build version: that comes from the release tag or the git commit (crates/lume-version).
 version = "1.0.0"
-repository = "https://github.com/douglaspands/lume-tv-launcher"
+repository = "https://github.com/noecamacho/clean-tv-os"
 edition = "2021"
 license = "GPL-3.0-or-later"
 rust-version = "1.99"

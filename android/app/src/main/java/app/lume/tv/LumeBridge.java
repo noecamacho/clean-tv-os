@@ -91,6 +91,31 @@ public final class LumeBridge {
                     return changed(context);
                 case "start":
                     return start(context, argument);
+                case "radios":
+                    return Settings.Global.getInt(context.getContentResolver(), "wifi_on", 0)
+                            + "," + Settings.Global.getInt(context.getContentResolver(), "bluetooth_on", 0);
+                case "click":
+                    return click(context, argument);
+                case "levels":
+                    return levels(context);
+                case "set-volume":
+                    return setVolume(context, argument);
+                case "set-brightness":
+                    return setBrightness(context, argument);
+                case "set-light-sensor":
+                    return setTclLightSensor(argument);
+                case "sleep-now":
+                    return HomeKeyService.sleep() ? "ok" : "no";
+                case "a11y":
+                    // Animations off is the TV's Reduce Motion; high-contrast text stands for
+                    // Reduce Transparency and Increase Contrast.
+                    return (Settings.Global.getFloat(context.getContentResolver(),
+                                    "animator_duration_scale", 1f) == 0f ? "1" : "0")
+                            + "," + Settings.Secure.getInt(context.getContentResolver(),
+                                    "high_text_contrast_enabled", 0);
+                case "launch-rect":
+                    launchRect = argument;
+                    return "ok";
                 case "settings":
                     return openSettings(context);
                 case "inputs":
@@ -582,10 +607,56 @@ public final class LumeBridge {
         intent.setComponent(new ComponentName(parts[0], parts[1]));
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
         try {
-            context.startActivity(intent);
+            context.startActivity(intent, scaleUpFromLaunchRect(context));
             return "ok";
         } catch (ActivityNotFoundException | SecurityException e) {
             return "missing";
+        }
+    }
+
+    private static android.media.SoundPool sounds;
+    private static int tick;
+
+    /** Argument: "pan,volume". The focus tick, only when the TV's system sounds are on. */
+    private static String click(Context context, String argument) {
+        if (Settings.System.getInt(context.getContentResolver(),
+                Settings.System.SOUND_EFFECTS_ENABLED, 0) == 0) {
+            return "off";
+        }
+        if (sounds == null) {
+            sounds = new android.media.SoundPool.Builder().setMaxStreams(2)
+                    .setAudioAttributes(new android.media.AudioAttributes.Builder()
+                            .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                            .build())
+                    .build();
+            tick = sounds.load(context, R.raw.focus_tick, 1);
+            return "loading"; // the first tick is lost while the sample loads
+        }
+        String[] parts = argument.split(",");
+        float pan = Float.parseFloat(parts[0]);
+        float volume = 0.5f * Float.parseFloat(parts[1]);
+        sounds.play(tick, volume * Math.min(1f, 1f - pan), volume * Math.min(1f, 1f + pan), 1, 0, 1f);
+        return "ok";
+    }
+
+    /** "x,y,w,h" in pixels: the banner the next started app grows from (set by "launch-rect"). */
+    private static String launchRect;
+
+    /** The scale-up animation from {@link #launchRect}, or null for the system's own. */
+    private static android.os.Bundle scaleUpFromLaunchRect(Context context) {
+        String rect = launchRect;
+        launchRect = null;
+        if (rect == null || !(context instanceof android.app.Activity)) {
+            return null;
+        }
+        try {
+            String[] p = rect.split(",");
+            return android.app.ActivityOptions.makeScaleUpAnimation(
+                    ((android.app.Activity) context).getWindow().getDecorView(),
+                    Integer.parseInt(p[0]), Integer.parseInt(p[1]),
+                    Integer.parseInt(p[2]), Integer.parseInt(p[3])).toBundle();
+        } catch (RuntimeException e) {
+            return null;
         }
     }
 
@@ -686,6 +757,115 @@ public final class LumeBridge {
         return !"android".equals(owner) && !"com.google.android.tv.frameworkpackagestubs".equals(owner);
     }
 
+    /** The screen brightness and the media volume, each from 0 to 100: "brightness,volume". */
+    private static String levels(Context context) {
+        android.media.AudioManager audio =
+                (android.media.AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        int max = Math.max(1, audio.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC));
+        int volume = audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
+        int backlight = tclBacklight();
+        if (backlight < 0) {
+            backlight = Math.round(Settings.System.getInt(context.getContentResolver(),
+                    Settings.System.SCREEN_BRIGHTNESS, 102) * 100f / 255f);
+        }
+        return backlight + "," + Math.round(volume * 100f / max) + "," + tclLightSensor();
+    }
+
+    /** Whether TCL's light sensor drives the backlight: 1, 0, or -1 where the TV has none. */
+    private static int tclLightSensor() {
+        try {
+            Class<?> manager = Class.forName("com.tcl.tv.pq.TvBacklightManager");
+            Object instance = manager.getMethod("getInstance").invoke(null);
+            int state = (Integer) manager.getMethod("getLightSensorOnoff").invoke(instance);
+            return state > 0 ? 1 : 0;
+        } catch (Throwable e) {
+            return -1;
+        }
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static String setTclLightSensor(String on) {
+        try {
+            Class<?> manager = Class.forName("com.tcl.tv.pq.TvBacklightManager");
+            Class act = Class.forName("com.tcl.tv.pq.EnTclActType");
+            Object instance = manager.getMethod("getInstance").invoke(null);
+            Object done = manager.getMethod("setLightSensorOnoff", int.class, act).invoke(instance,
+                    "1".equals(on) ? 1 : 0, Enum.valueOf(act, "EN_TCL_ACT_EXEC_SAVE"));
+            return Boolean.TRUE.equals(done) ? "ok" : "no";
+        } catch (Throwable e) {
+            android.util.Log.w("lume", "TCL light sensor: " + e);
+            return "no";
+        }
+    }
+
+    /**
+     * The panel's backlight (0 to 100) from TCL's picture library, or -1 where the TV has none.
+     * By reflection: the library is the TV's, not part of the SDK this app is built against.
+     */
+    private static int tclBacklight() {
+        try {
+            Class<?> manager = Class.forName("com.tcl.tv.pq.TvBacklightManager");
+            Object instance = manager.getMethod("getInstance").invoke(null);
+            return (Integer) manager.getMethod("getBacklight").invoke(instance);
+        } catch (Throwable e) {
+            return -1;
+        }
+    }
+
+    /** Sets the panel's backlight through TCL's picture library and saves it. */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static boolean setTclBacklight(int percent) {
+        try {
+            Class<?> manager = Class.forName("com.tcl.tv.pq.TvBacklightManager");
+            Class apply = Class.forName("com.tcl.tv.pq.EnApplyType");
+            Class act = Class.forName("com.tcl.tv.pq.EnTclActType");
+            Object instance = manager.getMethod("getInstance").invoke(null);
+            Object done = manager.getMethod("setBacklight", apply, int.class, act).invoke(instance,
+                    Enum.valueOf(apply, "EN_APPLY_CURRENT"), percent,
+                    Enum.valueOf(act, "EN_TCL_ACT_EXEC_SAVE"));
+            return Boolean.TRUE.equals(done);
+        } catch (Throwable e) {
+            android.util.Log.w("lume", "TCL backlight: " + e);
+            return false;
+        }
+    }
+
+    private static String setVolume(Context context, String percent) {
+        try {
+            android.media.AudioManager audio =
+                    (android.media.AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+            int max = audio.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+            int level = Math.round(Integer.parseInt(percent) * max / 100f);
+            audio.setStreamVolume(android.media.AudioManager.STREAM_MUSIC,
+                    Math.max(0, Math.min(max, level)), 0);
+            return "ok";
+        } catch (RuntimeException e) {
+            return "no";
+        }
+    }
+
+    /**
+     * Sets the backlight through Android's own brightness, which this TV passes to its panel.
+     * Needs the "modify system settings" access (adb: appops set app.lume.tv WRITE_SETTINGS allow).
+     */
+    private static String setBrightness(Context context, String percent) {
+        try {
+            // Never below 5 %: a black screen could not be undone by looking at it.
+            int wanted = Math.max(5, Math.min(100, Integer.parseInt(percent)));
+            if (setTclBacklight(wanted)) {
+                return "ok";
+            }
+            if (!Settings.System.canWrite(context)) {
+                return "no";
+            }
+            int level = Math.round(wanted * 255f / 100f);
+            return Settings.System.putInt(context.getContentResolver(),
+                    Settings.System.SCREEN_BRIGHTNESS, level) ? "ok" : "no";
+        } catch (RuntimeException e) {
+            return "no";
+        }
+    }
+
     /**
      * Constructs the intent cascade prioritized for the specific TV model profile.
      */
@@ -746,6 +926,20 @@ public final class LumeBridge {
                         new Intent(Settings.ACTION_SETTINGS)
                     };
                 }
+
+            case "airplay":
+                return new Intent[] {
+                    new Intent("com.realtek.media.airplay2.LAUNCH_SETTINGS"),
+                    new Intent("android.settings.CAST_SETTINGS"),
+                    new Intent(Settings.ACTION_SETTINGS)
+                };
+
+            case "mirror":
+                return new Intent[] {
+                    new Intent("com.tcl.miracast.test.MAINMENU"),
+                    new Intent("android.settings.CAST_SETTINGS"),
+                    new Intent(Settings.ACTION_SETTINGS)
+                };
 
             case "wifi":
                 return new Intent[] {

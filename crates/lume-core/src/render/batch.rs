@@ -43,6 +43,8 @@ pub enum Texture {
     Wallpaper,
     /// The RGBA atlas of wallpaper thumbnails.
     WallpaperThumbs,
+    /// The small blurred copy of the wallpaper.
+    WallpaperBlur,
 }
 
 /// One draw call: `quad_count` quads of `program`, starting at `first_quad` in that
@@ -82,7 +84,7 @@ pub struct RectVertex {
     pub is_gradient: f32,
     /// Attribute 3, xyz: gradient stop positions.
     pub stops: [f32; 3],
-    /// Attribute 3, w: unused.
+    /// Attribute 3, w: how much farther than the screen the vertex is under a tilt (0.0 flat).
     pub _padding: f32,
     /// Attributes 4 to 6: premultiplied RGBA of up to three stops (solid fills use the first).
     pub colors: [[f32; 4]; 3],
@@ -105,7 +107,8 @@ pub struct TexVertex {
     /// Attribute 3, x: corner radius. The rounded shape sits half an antialiasing ramp inside the
     /// quad, so its whole edge is drawn over the image's own pixels.
     pub radius: f32,
-    /// Attribute 3, yzw: unused padding to complete vec4.
+    /// Attribute 3, y: how much farther than the screen the vertex is under a tilt (0.0 flat);
+    /// zw: unused.
     pub _padding: [f32; 3],
     /// Attribute 4: premultiplied RGBA the image is composed over.
     pub background: [f32; 4],
@@ -238,7 +241,8 @@ impl Frame {
     /// Whether any batch samples the wallpaper texture.
     pub fn uses_wallpaper(&self) -> bool {
         self.batches.iter().any(|b| {
-            matches!(b.program, Program::Image | Program::Glass) && b.texture == Texture::Wallpaper
+            matches!(b.program, Program::Image | Program::Glass)
+                && matches!(b.texture, Texture::Wallpaper | Texture::WallpaperBlur)
         })
     }
 
@@ -259,6 +263,8 @@ struct Builder {
     clips: Vec<Rect>,
     /// Effective clip; `Some(None)` when it is empty and nothing can be seen.
     effective: Option<Option<Rect>>,
+    /// The perspective of [`Cmd::PushTilt`]: center and the two slopes of the distance.
+    tilt: Option<((f32, f32), f32, f32)>,
 }
 
 impl Builder {
@@ -272,15 +278,31 @@ impl Builder {
                 self.clips.pop();
                 self.recompute_clip();
             }
+            Cmd::PushTilt { center, ax, ay } => self.tilt = Some((*center, *ax, *ay)),
+            Cmd::PopTilt => self.tilt = None,
             Cmd::Rect(rect) => self.add_rect(rect),
             Cmd::Glyph(quad) => self.add_textured(Program::Text, Texture::Icons, quad),
             Cmd::Image(quad) => self.add_textured(Program::Image, Texture::Icons, quad),
             Cmd::Wallpaper(quad) => self.add_textured(Program::Image, Texture::Wallpaper, quad),
             Cmd::Glass(quad) => self.add_textured(Program::Glass, Texture::Wallpaper, quad),
+            Cmd::WallpaperBlur(quad) => {
+                self.add_textured(Program::Image, Texture::WallpaperBlur, quad)
+            }
             Cmd::WallpaperThumb(quad) => {
                 self.add_textured(Program::Image, Texture::WallpaperThumbs, quad)
             }
         }
+    }
+
+    /// Where the vertex at `[x, y]` goes under the tilt, and how much farther than the screen it
+    /// is (0.0 without a tilt). The vertex shader multiplies the position by that distance and
+    /// passes it as `w`, so the GPU interpolates everything across the quad in perspective.
+    fn project(&self, [x, y]: [f32; 2]) -> ([f32; 2], f32) {
+        let Some(((cx, cy), ax, ay)) = self.tilt else {
+            return ([x, y], 0.0);
+        };
+        let w = (1.0 + ax * (x - cx) + ay * (y - cy)).max(0.5);
+        ([cx + (x - cx) / w, cy + (y - cy) / w], w - 1.0)
     }
 
     fn recompute_clip(&mut self) {
@@ -351,19 +373,22 @@ impl Builder {
         let (d, uv) = (cmd.dest, cmd.uv);
         let half_size = [d.w / 2.0, d.h / 2.0];
         let radius = cmd.radius.min(half_size[0]).min(half_size[1]).max(0.0);
+        let corners = [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)]
+            .map(|(cx, cy)| (cx, cy, self.project([d.x + cx * d.w, d.y + cy * d.h])));
         let target = match program {
             Program::Image | Program::Glass => &mut self.frame.image_vertices,
             _ => &mut self.frame.text_vertices,
         };
-        for (cx, cy) in [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)] {
+        let color_end = cmd.fade_to.map_or(color, |c| premultiplied(c, 1.0));
+        for (cx, cy, (position, far)) in corners {
             target.push(TexVertex {
-                position: [d.x + cx * d.w, d.y + cy * d.h],
+                position,
                 uv: [uv.x + cx * uv.w, uv.y + cy * uv.h],
-                color,
+                color: if cy > 0.5 { color_end } else { color },
                 local: [(cx - 0.5) * d.w, (cy - 0.5) * d.h],
                 half_size,
                 radius,
-                _padding: [0.0; 3],
+                _padding: [far, 0.0, 0.0],
                 background,
             });
         }
@@ -425,9 +450,11 @@ impl Builder {
         for (corner_x, corner_y) in [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)] {
             let x = quad.x + corner_x * quad.w;
             let y = quad.y + corner_y * quad.h;
+            let (position, far) = self.project([x, y]);
             self.frame.rect_vertices.push(RectVertex {
-                position: [x, y],
+                position,
                 local: [x - cx, y - cy],
+                _padding: far,
                 ..vertex
             });
         }
@@ -623,6 +650,23 @@ mod tests {
             b.damage(&a),
             Some(Rect::new(100.0, 100.0, 250.0, 50.0).grow(AA_MARGIN))
         );
+    }
+
+    #[test]
+    fn a_tilt_draws_the_far_side_smaller_and_leaves_the_rest_flat() {
+        let mut list = DisplayList::new();
+        list.fill(R, 0.0, solid());
+        list.push_tilt(R.center(), 0.002, 0.0);
+        list.fill(R, 0.0, solid());
+        list.pop_tilt();
+        let frame = Frame::build(&list);
+        let (flat, tilted) = frame.rect_vertices.split_at(4);
+        assert!(flat.iter().all(|v| v._padding == 0.0));
+        // The right side is farther: nearer the center on the screen, and it says how far.
+        let (left, right) = (tilted[0], tilted[1]);
+        assert!(right._padding > 0.0 && left._padding < 0.0);
+        assert!(right.position[0] < flat[1].position[0]);
+        assert!(left.position[0] < flat[0].position[0]);
     }
 
     #[test]

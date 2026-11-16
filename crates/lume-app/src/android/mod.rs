@@ -8,6 +8,7 @@
 mod bridge;
 mod device_info;
 mod egl;
+mod vulkan;
 
 use android_activity::input::{InputEvent, KeyAction};
 use android_activity::{AndroidApp, AndroidAppWaker, InputStatus, MainEvent, PollEvent};
@@ -65,6 +66,11 @@ pub extern "system" fn Java_app_lume_tv_LumeActivity_nativeHomePressed(
     }
 }
 
+/// How long OK is held before it opens the menu instead of acting.
+const LONG_PRESS: Duration = Duration::from_millis(500);
+/// How often the open Control Center reads the TV's volume and backlight.
+const LEVELS_EVERY: Duration = Duration::from_millis(300);
+
 /// Icons fetched per call, so keys are still answered while they load.
 const ICONS_PER_TURN: usize = 8;
 /// How long a turn of the loop may load icons: while the splash waits for them (nothing moves and
@@ -119,9 +125,28 @@ struct Runtime {
     bridge: Bridge,
     shell: Shell,
     graphics: Option<Graphics>,
+    /// The renderer of the window that went away, kept (with the shell's glyphs and icons) so
+    /// coming back from an app is immediate. Dropped when the system runs short of memory.
+    parked: Option<Graphics>,
+    /// When the TV goes to sleep by the Control Center's timer.
+    sleep_at: Option<Instant>,
+    /// The focus tick of the last key, played once its frame is on its way.
+    click: Option<(f32, f32)>,
+    /// Whether the Control Center was on screen at the last key.
+    in_controls: bool,
+    /// When its sliders last read the TV's levels: the remote's own volume keys change them
+    /// without HOME seeing a key.
+    levels_read: Instant,
     /// The last frame drawn and what each of the last frames changed (newest first), to redraw
     /// only that: see `draw`.
     last_frame: Option<Frame>,
+    /// When OK went down, and whether that press already opened the menu: see `process_input`.
+    ok_down: Option<Instant>,
+    ok_long: bool,
+    /// Whether the shell was told OK is held (the pressed look of what has the focus).
+    pressed: bool,
+    /// When the focus tick last sounded.
+    last_click: Option<Instant>,
     damages: std::collections::VecDeque<Option<Rect>>,
     /// Apps whose icon could not be loaded in this window, so they are not asked again.
     icons_failed: HashSet<String>,
@@ -151,6 +176,12 @@ fn android_main(app: AndroidApp) {
     );
     std::panic::set_hook(Box::new(|info| log::error!("panic: {info}")));
     log::info!("lume {} starting", lume_version::VERSION);
+    // The thread that answers the remote and draws: ahead of background work, as the UI and
+    // render threads of a Java app are.
+    // SAFETY: changes the priority of the calling thread only.
+    unsafe {
+        libc::setpriority(libc::PRIO_PROCESS, 0, -10);
+    }
     *WAKER.lock().expect("waker lock") = Some(app.create_waker());
     let _ = APP.set(app.clone());
     lume_core::wallpaper::set_asset_reader(read_wallpaper_asset);
@@ -181,7 +212,16 @@ fn android_main(app: AndroidApp) {
         bridge,
         shell,
         graphics: None,
+        parked: None,
+        sleep_at: None,
+        click: None,
+        in_controls: false,
+        levels_read: Instant::now(),
         last_frame: None,
+        ok_down: None,
+        ok_long: false,
+        pressed: false,
+        last_click: None,
         damages: std::collections::VecDeque::new(),
         icons_failed: HashSet::new(),
         dock_failed: HashSet::new(),
@@ -209,7 +249,7 @@ impl Runtime {
             if self
                 .graphics
                 .as_mut()
-                .is_some_and(|g| g.backend().wallpaper_uploading())
+                .is_some_and(|g| g.wallpaper_uploading())
             {
                 self.shell.invalidate();
             }
@@ -226,9 +266,51 @@ impl Runtime {
                 .flatten()
                 .min()
             };
+            // A held OK becomes a long press without waiting for another event.
+            let held = self
+                .ok_down
+                .filter(|_| !self.ok_long)
+                .map(|down| LONG_PRESS.saturating_sub(down.elapsed()));
+            let min = |a: Option<Duration>, b: Option<Duration>| match (a, b) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (a, b) => a.or(b),
+            };
+            let timer = self
+                .sleep_at
+                .map(|at| at.saturating_duration_since(Instant::now()));
+            let timeout = min(min(timeout, held), timer);
+            // The Control Center follows the TV's volume and backlight while it is open.
+            let timeout = if self.in_controls && self.graphics.is_some() {
+                min(timeout, Some(LEVELS_EVERY))
+            } else {
+                timeout
+            };
             let app = self.app.clone();
             app.poll_events(timeout, |event| self.on_event(event));
             self.process_input();
+            if self.in_controls
+                && self.graphics.is_some()
+                && self.levels_read.elapsed() >= LEVELS_EVERY
+            {
+                self.refresh_levels();
+            }
+            if self.sleep_at.is_some_and(|at| Instant::now() >= at) {
+                self.sleep_at = None;
+                self.shell.set_sleep_timer(0);
+                if !self.bridge.sleep_now() {
+                    log::warn!("the sleep timer could not put the TV to sleep");
+                }
+            }
+            if !self.ok_long && self.ok_down.is_some_and(|t| t.elapsed() >= LONG_PRESS) {
+                self.ok_long = true;
+                self.send_key(Key::Menu);
+            }
+            let pressed = self.ok_down.is_some() && !self.ok_long;
+            if pressed != self.pressed {
+                self.pressed = pressed;
+                let now = self.now_ms();
+                self.shell.set_pressed(pressed, now);
+            }
             if WALLPAPER_READY.swap(false, Ordering::SeqCst) {
                 self.shell.invalidate();
             }
@@ -240,6 +322,10 @@ impl Runtime {
             if self.graphics.is_some() && self.shell.frame_due(self.now_ms()) {
                 self.draw();
             }
+            // After the frame: the call into Java does not delay what the key shows.
+            if let Some((pan, volume)) = self.click.take() {
+                self.bridge.click(pan, volume);
+            }
             let now = self.now_ms();
             if self.shell.stats_due(now) {
                 if let Some(stats) = self.bridge.stats() {
@@ -250,7 +336,7 @@ impl Runtime {
                 }
             }
             if self.shell.device_info_due(now) {
-                let gpu = self.graphics.as_mut().map(|g| g.backend().gpu_strings());
+                let gpu = self.graphics.as_mut().map(|g| g.gpu_strings());
                 let info = device_info::read(gpu, self.bridge.display());
                 self.shell.set_device_info(info);
             }
@@ -281,6 +367,10 @@ impl Runtime {
             MainEvent::Stop => self.destroy_window(),
             MainEvent::LowMemory => {
                 if self.graphics.is_none() {
+                    if self.parked.take().is_some() {
+                        self.shell.release_buffers();
+                        log::info!("low memory: the parked renderer, glyphs and icons released");
+                    }
                     purge_memory();
                 }
             }
@@ -304,13 +394,32 @@ impl Runtime {
         ) {
             log::warn!("cannot set the buffer size: {e}");
         }
-        match Graphics::new(window.ptr().as_ptr().cast()) {
-            Ok(graphics) => {
-                self.graphics = Some(graphics);
-                if let Some(graphics) = self.graphics.as_mut() {
-                    graphics.backend().set_render_size(width, height);
-                    graphics.backend().set_async_wallpaper(true);
+        let cache = self
+            .app
+            .internal_data_path()
+            .and_then(|files| files.parent().map(|parent| parent.join("cache")));
+        // Back from an app: the renderer that was kept only needs the new window.
+        let kept = self.parked.take().and_then(|mut graphics| {
+            match graphics.resume(window.ptr().as_ptr().cast(), (width, height)) {
+                Ok(()) => Some(graphics),
+                Err(e) => {
+                    log::warn!("the kept renderer could not come back ({e})");
+                    None
                 }
+            }
+        });
+        let warm = kept.is_some();
+        if !warm {
+            self.shell.release_buffers();
+        }
+        let made = match kept {
+            Some(graphics) => Ok(graphics),
+            None => Graphics::new(window.ptr().as_ptr().cast(), (width, height), cache),
+        };
+        match made {
+            Ok(mut graphics) => {
+                graphics.set_async_wallpaper(true);
+                self.graphics = Some(graphics);
                 self.first_frame_from = Some(Instant::now());
                 self.ready_from = self.first_frame_from;
                 self.icon_times = IconTimes {
@@ -318,7 +427,10 @@ impl Runtime {
                     ..IconTimes::default()
                 };
                 self.shell.wake(width, height);
-                log::info!("window {width}x{height}");
+                log::info!(
+                    "window {width}x{height}{}",
+                    if warm { " (kept renderer)" } else { "" }
+                );
             }
             Err(e) => log::error!("cannot start the renderer: {e}"),
         }
@@ -337,19 +449,28 @@ impl Runtime {
             Some(ndk::hardware_buffer_format::HardwareBufferFormat::R8G8B8A8_UNORM),
         );
         if let Some(graphics) = self.graphics.as_mut() {
-            graphics.backend().set_render_size(width, height);
+            graphics.set_render_size(width, height);
         }
         self.shell.wake(width, height);
     }
 
     /// Releases the renderer, the glyph atlas and the heap pages they used.
     fn destroy_window(&mut self) {
-        let had_graphics = self.graphics.take().is_some();
+        let Some(mut graphics) = self.graphics.take() else {
+            return;
+        };
         self.icons_failed.clear();
         self.dock_failed.clear();
         self.icons_pending = false;
-        self.shell.sleep();
-        if had_graphics {
+        self.last_frame = None;
+        self.damages.clear();
+        if graphics.park() {
+            self.parked = Some(graphics);
+            self.shell.sleep(true);
+            log::info!("window gone: renderer kept for the way back");
+        } else {
+            drop(graphics);
+            self.shell.sleep(false);
             purge_memory();
             log::info!("window gone: renderer, glyph atlas and fonts released (dormant)");
         }
@@ -364,6 +485,15 @@ impl Runtime {
     fn refresh_system_settings(&mut self) {
         self.shell.set_locales(&self.bridge.locales());
         self.shell.set_clock(self.bridge.clock());
+        if let Some((wifi, bluetooth)) = self.bridge.radios() {
+            self.shell.set_radios(wifi, bluetooth);
+        }
+        if let Some((reduce_motion, more_contrast)) = self.bridge.accessibility() {
+            self.shell.set_accessibility(reduce_motion, more_contrast);
+        }
+        if let Some((brightness, volume, auto)) = self.bridge.levels() {
+            self.shell.set_levels(brightness, volume, auto);
+        }
     }
 
     /// Picks up apps installed, updated or removed since the last time.
@@ -392,6 +522,9 @@ impl Runtime {
 
     fn process_input(&mut self) {
         let mut pressed_codes = Vec::new();
+        // OK acts when it is released; held for half a second it opens the menu of what has the
+        // focus instead, as a long press does on tvOS.
+        let (mut ok_down, mut ok_long) = (self.ok_down, self.ok_long);
         match self.app.input_events_iter() {
             Ok(mut iter) => loop {
                 let more = iter.next(|event| match event {
@@ -412,8 +545,28 @@ impl Runtime {
                             }
                             return InputStatus::Unhandled;
                         }
-                        if key.action() == KeyAction::Down {
-                            pressed_codes.push(code);
+                        let plain_ok = !app.is_listening_key()
+                            && match app.keys.action_for(code) {
+                                Some(action) => {
+                                    matches!(action, lume_core::keys::KeyAction::Key(Key::Ok))
+                                }
+                                None => lume_core::keys::from_android(code) == Some(Key::Ok),
+                            };
+                        match key.action() {
+                            KeyAction::Down if plain_ok => {
+                                // Repeats of a held key change nothing: the loop times the press.
+                                if ok_down.is_none() {
+                                    ok_down = Some(Instant::now());
+                                    ok_long = false;
+                                }
+                            }
+                            KeyAction::Up if plain_ok => {
+                                if ok_down.take().is_some() && !ok_long {
+                                    pressed_codes.push(code);
+                                }
+                            }
+                            KeyAction::Down => pressed_codes.push(code),
+                            _ => {}
                         }
                         InputStatus::Handled
                     }
@@ -425,6 +578,7 @@ impl Runtime {
             },
             Err(e) => log::warn!("no input events: {e:?}"),
         }
+        (self.ok_down, self.ok_long) = (ok_down, ok_long);
         for code in pressed_codes {
             self.send_keycode(code);
         }
@@ -432,21 +586,77 @@ impl Runtime {
 
     fn send_keycode(&mut self, code: i32) {
         let now = self.now_ms();
+        let focus = self.shell.app().focused();
         for effect in self.shell.raw_key(code, now) {
             self.run_effect(effect);
         }
+        self.after_key(focus);
     }
 
     fn send_key(&mut self, key: Key) {
         let now = self.now_ms();
+        let focus = self.shell.app().focused();
         for effect in self.shell.key(key, now) {
             self.run_effect(effect);
+        }
+        self.after_key(focus);
+    }
+
+    /// What a key leaves for the platform: the navigation sound when the focus moved, and the
+    /// state of the radios while the Control Center shows it.
+    fn after_key(&mut self, focus_before: Option<u32>) {
+        let controls = matches!(
+            self.shell.app().screen(),
+            lume_core::app::Screen::ControlCenter
+        );
+        if controls && !self.in_controls {
+            self.refresh_levels();
+        }
+        self.in_controls = controls;
+        if self.shell.app().focused() != focus_before {
+            // tvOS: the tick comes from where the focus is on the screen, and is quieter while
+            // the focus runs.
+            let pan = self
+                .shell
+                .app()
+                .focused_rect_on_screen()
+                .map_or(0.0, |r| (r.center().0 / 640.0 - 1.0).clamp(-1.0, 1.0));
+            let running = self
+                .last_click
+                .is_some_and(|t| t.elapsed() < Duration::from_millis(180));
+            self.last_click = Some(Instant::now());
+            self.click = Some((pan, if running { 0.45 } else { 1.0 }));
+        }
+        if matches!(
+            self.shell.app().screen(),
+            lume_core::app::Screen::ControlCenter
+        ) {
+            if let Some((wifi, bluetooth)) = self.bridge.radios() {
+                self.shell.set_radios(wifi, bluetooth);
+            }
+        }
+    }
+
+    /// The Control Center was just opened: its sliders show what the TV has now.
+    fn refresh_levels(&mut self) {
+        self.levels_read = Instant::now();
+        if let Some((brightness, volume, auto)) = self.bridge.levels() {
+            self.shell.set_levels(brightness, volume, auto);
         }
     }
 
     fn run_effect(&mut self, effect: Effect) {
         match effect {
             Effect::OpenApp { package, activity } => {
+                // The app grows out of its banner, as on tvOS.
+                if let (Some(rect), Some(viewport)) = (
+                    self.shell.app().focused_rect_on_screen(),
+                    self.shell.viewport(),
+                ) {
+                    let [x, y, w, h] = Gles2Backend::device_rect(&rect, &viewport);
+                    self.bridge
+                        .set_launch_rect([x, viewport.height as i32 - y - h, w, h]);
+                }
                 if !self.bridge.start_app(&package, &activity) {
                     // It was uninstalled meanwhile: say so, and refresh the catalog.
                     let now = self.now_ms();
@@ -480,6 +690,39 @@ impl Runtime {
                     log::warn!("the uninstaller of {package} could not be opened");
                 }
             }
+            Effect::OpenPanel(name) => {
+                if !self.bridge.open_setting(name) {
+                    log::warn!("the TV screen {name:?} could not be opened");
+                }
+            }
+            Effect::SetVolume(percent) => {
+                self.bridge.set_volume(percent);
+            }
+            Effect::SetBrightness(percent) => {
+                // Without the access to system settings the TV's own picture screen has it.
+                if !self.bridge.set_brightness(percent) {
+                    self.refresh_levels();
+                    self.bridge.open_setting("picture");
+                }
+            }
+            Effect::SetAutoBrightness(on) => {
+                self.bridge.set_auto_brightness(on);
+                self.refresh_levels();
+                // Some models take the order and keep the sensor off (the 55Q5K does): the
+                // TV's picture screen is then the place to look.
+                if self.shell.app().auto_brightness != Some(on) {
+                    self.bridge.open_setting("picture");
+                }
+            }
+            Effect::Sleep => {
+                if !self.bridge.sleep_now() {
+                    log::warn!("the TV could not be put to sleep");
+                }
+            }
+            Effect::SleepTimer(minutes) => {
+                self.sleep_at = (minutes > 0)
+                    .then(|| Instant::now() + Duration::from_secs(u64::from(minutes) * 60));
+            }
             // The shell already saved these.
             Effect::SaveConfig | Effect::SaveUsage | Effect::SaveKeys => {}
         }
@@ -489,10 +732,8 @@ impl Runtime {
     /// for the reveal: uploaded by the reveal's first frame, it made that frame ~70 ms late.
     fn prepare_wallpaper(&mut self) {
         if let Some(graphics) = self.graphics.as_mut() {
-            if self.shell.app().in_splash() && !graphics.backend().has_wallpaper() {
-                graphics
-                    .backend()
-                    .poll_wallpaper(self.shell.app().config.wallpaper);
+            if self.shell.app().in_splash() && !graphics.has_wallpaper() {
+                graphics.poll_wallpaper(self.shell.app().config.wallpaper);
             }
         }
     }
@@ -551,9 +792,8 @@ impl Runtime {
             match region {
                 Some((region, pixels)) => {
                     let upload = Instant::now();
-                    let backend = graphics.backend();
-                    backend.ensure_image(layout.width, layout.height);
-                    backend.update_image(region, &pixels);
+                    graphics.ensure_image(layout.width, layout.height);
+                    graphics.update_image(region, &pixels);
                     self.icon_times.upload += upload.elapsed();
                 }
                 None => {
@@ -583,9 +823,8 @@ impl Runtime {
             match (art, region) {
                 (Some((pixels, _)), Some(region)) => {
                     let upload = Instant::now();
-                    let backend = graphics.backend();
-                    backend.ensure_image(layout.width, layout.height);
-                    backend.update_image(region, &pixels);
+                    graphics.ensure_image(layout.width, layout.height);
+                    graphics.update_image(region, &pixels);
                     self.icon_times.upload += upload.elapsed();
                 }
                 _ => {
@@ -626,7 +865,7 @@ impl Runtime {
             return;
         };
         if let Some(text) = self.shell.text_engine() {
-            graphics.backend().sync_text_atlas(text);
+            graphics.sync_text_atlas(text);
         }
         let background = match lume_core::theme::THEME.app.base.background {
             Some(lume_core::theme::Paint::Solid(color)) => color,
@@ -635,13 +874,13 @@ impl Runtime {
         let _: Color = background;
         // Only what changed since the buffer's own content is redrawn: the fill rate of the
         // TV's GPU does not reach a whole 1080p frame of glass every 16 ms.
-        graphics.backend().prepare(&frame);
-        let content_changed = graphics.backend().take_content_changed();
+        graphics.prepare(&frame);
+        let content_changed = graphics.take_content_changed();
         let damage = match &self.last_frame {
             Some(last) if !content_changed => frame.damage(last),
             _ => Some(FULL_DAMAGE),
         };
-        let age = graphics.egl.buffer_age();
+        let age = graphics.buffer_age();
         let repaint = if age == 0 || age > self.damages.len() + 1 {
             Some(FULL_DAMAGE)
         } else {
@@ -661,16 +900,7 @@ impl Runtime {
             scissor = [0, 0, 1, 1];
         }
         let whole = scissor[2] as u32 >= viewport.width && scissor[3] as u32 >= viewport.height;
-        if !whole {
-            graphics.egl.set_damage(scissor);
-        }
-        graphics.backend().render_damaged(
-            &viewport,
-            background,
-            frame,
-            (!whole).then_some(scissor),
-        );
-        let swapped = graphics.egl.swap_buffers();
+        let swapped = graphics.present(&viewport, background, frame, (!whole).then_some(scissor));
         if let Err(e) = &swapped {
             log::warn!("{e}");
         } else if let Some(from) = self.first_frame_from.take() {

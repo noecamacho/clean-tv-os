@@ -34,6 +34,9 @@ pub struct TexturedCmd {
     /// What an image is composed over inside its shape: the item's own color, so the shape has
     /// one antialiased edge instead of one for a fill and another for the image over it.
     pub background: Color,
+    /// The color at the bottom edge, when it is not `color` all the way down: the wallpaper
+    /// carries its own veil this way, in the one pass that draws it.
+    pub fade_to: Option<Color>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -47,10 +50,20 @@ pub enum Cmd {
     Wallpaper(TexturedCmd),
     /// A rounded, softly blurred and refracted sample of the wallpaper.
     Glass(TexturedCmd),
+    /// A piece of the blurred copy of the wallpaper, drawn as the wallpaper is.
+    WallpaperBlur(TexturedCmd),
     /// A thumbnail from the wallpaper thumbnails atlas, with optional rounded corners.
     WallpaperThumb(TexturedCmd),
     PushClip(Rect),
     PopClip,
+    /// What follows is seen in perspective, as a card turned about `center`: a point `(x, y)`
+    /// is `1 + ax * (x - center.0) + ay * (y - center.1)` times as far as the screen.
+    PushTilt {
+        center: (f32, f32),
+        ax: f32,
+        ay: f32,
+    },
+    PopTilt,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -118,6 +131,7 @@ impl DisplayList {
             color,
             radius: 0.0,
             background: Color::TRANSPARENT,
+            fade_to: None,
         }));
     }
 
@@ -146,6 +160,7 @@ impl DisplayList {
             color,
             radius,
             background,
+            fade_to: None,
         }));
     }
 
@@ -172,6 +187,48 @@ impl DisplayList {
             color,
             radius,
             background: Color::TRANSPARENT,
+            fade_to: None,
+        }));
+    }
+
+    /// The wallpaper with a veil of its own: `top` at the top edge of `dest`, `bottom` at the
+    /// bottom one.
+    pub fn wallpaper_shaded_with_id(
+        &mut self,
+        dest: Rect,
+        uv: Rect,
+        top: Color,
+        bottom: Color,
+        id: WallpaperId,
+    ) {
+        self.wallpaper = Some(id);
+        self.cmds.push(Cmd::Wallpaper(TexturedCmd {
+            dest,
+            uv,
+            color: top,
+            radius: 0.0,
+            background: Color::TRANSPARENT,
+            fade_to: Some(bottom),
+        }));
+    }
+
+    /// [`wallpaper_shaded_with_id`](Self::wallpaper_shaded_with_id) from the blurred copy.
+    pub fn wallpaper_blur_shaded_with_id(
+        &mut self,
+        dest: Rect,
+        uv: Rect,
+        top: Color,
+        bottom: Color,
+        id: WallpaperId,
+    ) {
+        self.wallpaper = Some(id);
+        self.cmds.push(Cmd::WallpaperBlur(TexturedCmd {
+            dest,
+            uv,
+            color: top,
+            radius: 0.0,
+            background: Color::TRANSPARENT,
+            fade_to: Some(bottom),
         }));
     }
 
@@ -190,6 +247,7 @@ impl DisplayList {
             color,
             radius,
             background: Color::TRANSPARENT,
+            fade_to: None,
         }));
     }
 
@@ -200,6 +258,7 @@ impl DisplayList {
             color: Color::WHITE,
             radius,
             background: Color::TRANSPARENT,
+            fade_to: None,
         }));
     }
 
@@ -213,12 +272,16 @@ impl DisplayList {
                 Cmd::Glyph(t)
                 | Cmd::Image(t)
                 | Cmd::Wallpaper(t)
+                | Cmd::WallpaperBlur(t)
                 | Cmd::Glass(t)
                 | Cmd::WallpaperThumb(t) => {
                     t.color.a = (f32::from(t.color.a) * factor).round() as u8;
+                    if let Some(end) = t.fade_to.as_mut() {
+                        end.a = (f32::from(end.a) * factor).round() as u8;
+                    }
                     t.background.a = (f32::from(t.background.a) * factor).round() as u8;
                 }
-                Cmd::PushClip(_) | Cmd::PopClip => {}
+                Cmd::PushClip(_) | Cmd::PopClip | Cmd::PushTilt { .. } | Cmd::PopTilt => {}
             }
         }
     }
@@ -232,12 +295,14 @@ impl DisplayList {
                 Cmd::Glyph(t)
                 | Cmd::Image(t)
                 | Cmd::Wallpaper(t)
+                | Cmd::WallpaperBlur(t)
                 | Cmd::Glass(t)
                 | Cmd::WallpaperThumb(t) => {
                     t.dest = t.dest.translate(0.0, dy);
                 }
                 Cmd::PushClip(rect) => *rect = rect.translate(0.0, dy),
-                Cmd::PopClip => {}
+                Cmd::PushTilt { center, .. } => center.1 += dy,
+                Cmd::PopClip | Cmd::PopTilt => {}
             }
         }
     }
@@ -253,6 +318,16 @@ impl DisplayList {
 
     pub fn pop_clip(&mut self) {
         self.cmds.push(Cmd::PopClip);
+    }
+
+    /// Turns what is drawn until [`pop_tilt`](Self::pop_tilt) about `center`, in perspective: see
+    /// [`Cmd::PushTilt`]. Tilts do not nest.
+    pub fn push_tilt(&mut self, center: (f32, f32), ax: f32, ay: f32) {
+        self.cmds.push(Cmd::PushTilt { center, ax, ay });
+    }
+
+    pub fn pop_tilt(&mut self) {
+        self.cmds.push(Cmd::PopTilt);
     }
 
     /// Draws a box the way its theme style describes it: shadow, fill, then outline.
@@ -341,7 +416,7 @@ mod tests {
 
     #[test]
     fn a_box_with_a_background_is_filled_between_shadow_and_ring() {
-        let style = THEME.resolve(&THEME.editor_row, StateFlags::FOCUS);
+        let style = THEME.resolve(&THEME.chip, StateFlags::FOCUS);
         let mut list = DisplayList::new();
         list.draw_box(Rect::new(0.0, 0.0, 400.0, 71.0), &style);
         assert_eq!(list.len(), 2);

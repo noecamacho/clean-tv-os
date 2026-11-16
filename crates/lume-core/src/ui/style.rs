@@ -158,7 +158,7 @@ mod tests {
             panic!()
         };
         assert_eq!(m, mix_color(a, b, 0.5));
-        assert!(m.r > a.r.min(b.r) - 1 && m.r < a.r.max(b.r) + 1);
+        assert!(m.r >= a.r.min(b.r) && m.r <= a.r.max(b.r));
     }
 
     #[test]

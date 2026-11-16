@@ -25,6 +25,11 @@
     <string name="settings_key_mapping">Remote control</string>
     <string name="settings_tv_info">TV information</string>
     <string name="settings_about">About HOME</string>
+    <string name="settings_wallpaper">Wallpaper</string>
+    <string name="settings_tv_section">TV settings</string>
+    <string name="settings_network">Network</string>
+    <string name="settings_home_order">Main row and order</string>
+    <string name="settings_all">All settings</string>
 
     <!-- TV status panel -->
     <string name="stats_title">TV STATUS</string>
@@ -84,17 +89,17 @@
     <string name="wallpaper_beach_sunset">Sunset Beach</string>
     <string name="wallpaper_beach_dawn">Dawn Beach</string>
     <string name="wallpaper_aurora">Aurora</string>
-    <string name="wallpaper_mountain_stars">Starry Mountains</string>
-    <string name="wallpaper_misty_forest">Misty Forest</string>
+    <string name="wallpaper_mountain_stars">Mountain valley</string>
+    <string name="wallpaper_misty_forest">Misty forest</string>
     <string name="wallpaper_glass_facade">Glass Facade</string>
-    <string name="wallpaper_synthwave_grid">Synthwave Grid</string>
-    <string name="wallpaper_mirror_lake">Mirror Lake</string>
-    <string name="editor_round_favorites">Round favorites</string>
+    <string name="wallpaper_synthwave_grid">Mountain at dusk</string>
+    <string name="wallpaper_mirror_lake">Castle in the mist</string>
+    <string name="editor_six_columns">Six icons per row</string>
     <string name="editor_breadcrumb_edit">Edit</string>
     <string name="editor_title">Edit home screen</string>
     <string name="editor_done">Done</string>
     <string name="editor_favorites_order">Favorites</string>
-    <string name="editor_favorites_description">Choose the order of the apps on the dock. Select one and use the buttons to move it or remove it.</string>
+    <string name="editor_favorites_description">Choose the order of the apps on the main row. Select one and use the buttons to move it or remove it.</string>
     <string name="editor_use_arrows">Use the arrows to move</string>
     <string name="editor_add_app">Add app:</string>
     <plurals name="editor_limit_reached">
@@ -195,6 +200,15 @@
     <string name="control_picture">Picture</string>
     <string name="control_sound">Sound</string>
     <string name="control_ambient">Ambient mode</string>
+    <string name="control_sleep_now">Sleep</string>
+    <string name="control_brightness">Brightness</string>
+    <string name="control_volume">Volume</string>
+    <string name="control_timer">Sleep timer</string>
+    <string name="control_timer_off">Off</string>
+    <string name="control_on">On</string>
+    <string name="control_auto">Auto</string>
+    <string name="control_mirror">Screen mirroring</string>
+    <string name="control_airplay">AirPlay</string>
     <string name="control_apps">Apps</string>
     <string name="control_settings">Settings</string>
 </resources>

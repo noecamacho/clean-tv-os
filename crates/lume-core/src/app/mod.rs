@@ -110,6 +110,17 @@ pub enum Effect {
     Uninstall {
         package: String,
     },
+    /// A screen of the TV by the name the platform knows it (`open-setting` of the bridge).
+    OpenPanel(&'static str),
+    /// The backlight and the media volume, from 0 to 100 (the Control Center's sliders).
+    SetBrightness(u8),
+    SetVolume(u8),
+    /// Lets the TV's light sensor drive the backlight, or not.
+    SetAutoBrightness(bool),
+    /// Puts the TV to sleep now.
+    Sleep,
+    /// Puts the TV to sleep after this many minutes; zero cancels it.
+    SleepTimer(u16),
     /// The home configuration changed and must be written to disk.
     SaveConfig,
     /// The usage history changed and must be written to disk.
@@ -125,6 +136,8 @@ pub enum Screen {
     Settings,
     /// Quick TV controls shown in a glass panel.
     ControlCenter,
+    /// The wallpaper whole and the time, after a while without keys (the tvOS screen saver).
+    Ambient,
     About,
     /// The TV's technical sheet (opened from the settings).
     TvInfo,
@@ -138,13 +151,28 @@ pub enum Screen {
     KeyMapPickSetting,
 }
 
+/// How long Home waits without keys before it settles: what does not have the focus dims and what
+/// has it grows a little. Apple gives no time for it.
+const IDLE_AFTER_MS: u64 = 10_000;
+const IDLE_IN: crate::theme::Transition = crate::theme::Transition {
+    duration_ms: 900.0,
+    curve: crate::theme::Curve::EaseInOut,
+};
+const IDLE_OUT: crate::theme::Transition = crate::theme::Transition {
+    duration_ms: 200.0,
+    curve: crate::theme::Curve::EaseOut,
+};
+const PRESS: crate::theme::Transition = crate::theme::Transition {
+    duration_ms: 90.0,
+    curve: crate::theme::Curve::EaseOut,
+};
+
 /// What is animated.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum Anim {
     /// How focused an element is, 0.0 to 1.0.
     Focus(FocusId),
     ScrollY,
-    WallpaperScrollX,
     /// The place (fractional while it moves) of the dock icon that is magnified.
     DockPosition,
     /// How much the dock magnifies, 0.0 (the focus is elsewhere) to 1.0.
@@ -165,6 +193,12 @@ pub(super) enum Anim {
     Reveal,
     /// How open the Control Center is, 0.0 to 1.0.
     Control,
+    /// Runs while a favorite is being moved, so frames keep coming for the jiggle.
+    Jiggle,
+    /// How far Home has settled after a while without keys, 0.0 to 1.0.
+    Idle,
+    /// How far down OK is held, 0.0 to 1.0.
+    Press,
     /// How visible the splash logo is while it fades in, 0.0 to 1.0.
     SplashLogo,
     /// How visible an icon that arrived with the interface on screen is, 0.0 to 1.0: the tile cell
@@ -205,10 +239,34 @@ pub struct LumeApp {
     pub keys: crate::keys::KeyMap,
     pub translator: Translator,
     pub clock: WallClock,
+    /// Whether Wi-Fi and Bluetooth are on, as the platform last said (the Control Center).
+    pub radios: (bool, bool),
+    /// The backlight and the media volume, from 0 to 100, as the platform last said.
+    pub levels: (u8, u8),
+    /// Whether the TV's light sensor drives the backlight; `None` where it has none.
+    pub auto_brightness: Option<bool>,
+    /// Which list of the settings is on screen.
+    pub(super) settings_page: settings::SettingsPage,
+    /// Minutes of the sleep timer chosen in the Control Center; zero when it is off.
+    pub sleep_timer: u16,
+    /// The TV's accessibility choices: animations off (tvOS's Reduce Motion) and high-contrast
+    /// text (which HOME reads as Reduce Transparency and Increase Contrast together).
+    pub reduce_motion: bool,
+    pub more_contrast: bool,
+    /// What had the focus on Home at the last frame, and the direction it last moved in.
+    home_focus: Option<(FocusId, Rect)>,
+    home_sway: (f32, f32),
+    /// When the last key came, and whether Home has settled since (see `IDLE_AFTER_MS`).
+    last_input_ms: u64,
+    idle: bool,
+    /// When the focus last moved: a focus that runs is animated faster.
+    last_focus_ms: u64,
     screen: Screen,
     control_origin: Tab,
     /// What had the focus when the Control Center opened, to give it back when it closes.
     control_focus: Option<FocusId>,
+    /// The Control Center is going away: the screen changes when its animation ends.
+    control_closing: bool,
     /// Whether the system has a TV inputs panel: the top bar shows its button only then.
     pub inputs_available: bool,
     editor: editor::EditorState,
@@ -295,6 +353,19 @@ impl LumeApp {
             screen: Screen::Main(Tab::Home),
             control_origin: Tab::Home,
             control_focus: None,
+            control_closing: false,
+            radios: (true, true),
+            levels: (40, 20),
+            auto_brightness: None,
+            sleep_timer: 0,
+            settings_page: settings::SettingsPage::Root,
+            reduce_motion: false,
+            more_contrast: false,
+            home_focus: None,
+            home_sway: (0.0, 0.0),
+            last_input_ms: 0,
+            idle: false,
+            last_focus_ms: 0,
             inputs_available: false,
             editor: editor::EditorState::default(),
             keymap: keymap::KeyMapState::default(),
@@ -367,6 +438,21 @@ impl LumeApp {
     /// Handles a key press.
     pub fn handle_key(&mut self, key: Key, now_ms: u64) -> Vec<Effect> {
         self.now_ms = now_ms;
+        self.last_input_ms = now_ms;
+        if self.idle {
+            self.idle = false;
+            let settled = self.anim.get(Anim::Idle, 0.0, now_ms);
+            self.anim
+                .animate_to(Anim::Idle, settled, 0.0, now_ms, Some(IDLE_OUT));
+        }
+
+        // Any key gives the screen back; it does nothing else.
+        if self.screen == Screen::Ambient {
+            self.screen = Screen::Main(Tab::Home);
+            self.scroll_to_top();
+            self.pending_focus = Some(PendingFocus::FirstContent);
+            return vec![];
+        }
 
         // Listening for a key: Back cancels and the keys the interface needs are refused.
         if self.is_listening_key() {
@@ -505,12 +591,15 @@ impl LumeApp {
                 match self.return_point.take() {
                     // Back from the app that was opened: the screen and the focus as they were.
                     Some(point) if self.just_returned() => self.restore(point),
+                    // The press that brought HOME back from another app: it shows its start and
+                    // nothing else (not the Control Center, which that same press would open).
+                    _ if self.just_returned() => self.go_home(),
                     // Home on the Control Center closes it, as the TV button does on tvOS.
                     _ if self.screen == Screen::ControlCenter => return self.back(),
                     // Already at the start of Home: Home opens the Control Center (tvOS opens it
                     // from the TV button).
                     _ if self.screen == Screen::Main(Tab::Home)
-                        && self.context_menu.is_none()
+                        && !self.menu_is_open()
                         && self.current_scroll_y() < 0.5
                         && self
                             .focus
@@ -533,6 +622,11 @@ impl LumeApp {
     }
 
     fn horizontal(&mut self, direction: Direction) -> Vec<Effect> {
+        if self.screen == Screen::ControlCenter {
+            if let Some(effects) = self.slide_control(direction) {
+                return effects;
+            }
+        }
         self.move_focus(direction);
         // Moving the focus onto a tab shows that tab at once, without OK. The focus stays on it.
         if matches!(self.screen, Screen::Main(_)) {
@@ -553,7 +647,7 @@ impl LumeApp {
             Screen::Main(_) => {}
             Screen::Settings => return self.activate_settings(id),
             Screen::ControlCenter => return self.activate_control_center(id),
-            Screen::About | Screen::TvInfo => return vec![],
+            Screen::About | Screen::TvInfo | Screen::Ambient => return vec![],
             Screen::Editor => return self.activate_editor(id),
             Screen::KeyMap => return self.activate_keymap(id),
             Screen::KeyMapPickApp => return self.activate_pick_app(id),
@@ -585,7 +679,16 @@ impl LumeApp {
     fn back(&mut self) -> Vec<Effect> {
         match self.screen {
             Screen::Main(Tab::Home) => {
-                // Back on the home root scrolls to the top and never closes lume.
+                // tvOS: Back on the first app starts the screen saver (here, the TV's ambient
+                // mode). Anywhere else on Home it goes back to that first app.
+                let first = self.focus.rows().get(1).and_then(|row| row.items.first());
+                if self.scroll_y < 0.5
+                    && first.is_some_and(|f| Some(f.id) == self.focus.current_id())
+                    && self.focus.current_id() != Some(ids::FAVORITES_ADD)
+                {
+                    self.enter_ambient();
+                    return vec![];
+                }
                 self.scroll_to_top();
                 self.pending_focus = Some(PendingFocus::FirstContent);
                 vec![]
@@ -600,10 +703,17 @@ impl LumeApp {
                 vec![]
             }
             Screen::ControlCenter => {
-                self.screen = Screen::Main(self.control_origin);
-                self.pending_focus = Some(PendingFocus::Id(
-                    self.control_focus.take().unwrap_or(ids::CONTROL_CENTER),
-                ));
+                if !self.control_closing {
+                    self.control_closing = true;
+                    let open = self.anim.get(Anim::Control, 1.0, self.now_ms);
+                    self.anim.animate_to(
+                        Anim::Control,
+                        open,
+                        0.0,
+                        self.now_ms,
+                        Some(control_center::CLOSE),
+                    );
+                }
                 vec![]
             }
             Screen::About => {
@@ -611,6 +721,8 @@ impl LumeApp {
                 self.pending_focus = Some(PendingFocus::Id(settings::ITEM_ABOUT));
                 vec![]
             }
+            // `handle_key` leaves it before any key gets here.
+            Screen::Ambient => vec![],
             Screen::TvInfo => {
                 self.back_from_tv_info();
                 vec![]
@@ -651,6 +763,54 @@ impl LumeApp {
     /// lume left the screen (another app is in front).
     pub fn went_to_background(&mut self) {
         self.foreground = false;
+        // Whatever was open is left behind: the next time HOME shows, it is at its start, with
+        // the first app in focus, the library folded and nothing over it.
+        self.return_point = None;
+        self.control_closing = false;
+        self.control_focus = None;
+        self.go_home();
+    }
+
+    /// lume is on the screen again with everything it had: no splash, the screen as it was left.
+    pub fn returned_to_foreground(&mut self) {
+        self.foreground = true;
+        self.wake_pending = true;
+        self.foreground_since = None;
+        self.last_input_ms = self.now_ms;
+    }
+
+    /// How long Home waits without keys before the ambient screen, as chosen in the settings;
+    /// `None` when it is off.
+    fn ambient_after_ms(&self) -> Option<u64> {
+        (self.config.ambient_minutes > 0).then(|| u64::from(self.config.ambient_minutes) * 60_000)
+    }
+
+    /// Gives the screen to the wallpaper and the time until the next key.
+    fn enter_ambient(&mut self) {
+        self.screen = Screen::Ambient;
+        self.context_menu = None;
+        self.focus.set_rows(vec![]);
+    }
+
+    fn draw_ambient(&mut self, p: &mut Painter) {
+        self.update_focus(vec![]);
+        let safe = p.display.safe_area();
+        p.text_with(
+            &self.clock.text(),
+            Rect::new(54.0, safe.bottom() - 150.0, 900.0, 120.0),
+            crate::text::Align::Start,
+            &crate::text::TextStyle {
+                size: 96.0,
+                weight: 700,
+                letter_spacing: -1.0,
+            },
+            crate::theme::Color::WHITE,
+        );
+    }
+
+    /// Whether lume is the app on screen.
+    pub fn is_foreground(&self) -> bool {
+        self.foreground
     }
 
     /// lume is on the screen again.
@@ -740,6 +900,31 @@ impl LumeApp {
 
     /// Moves the focus to `id` directly (for tests of code built on top of the launcher).
     #[doc(hidden)]
+    /// The Apps screen, which Home no longer leads to (it has no bar of tabs), with the focus on
+    /// its tab as when it was entered from the bar.
+    #[doc(hidden)]
+    pub fn open_apps_tab_for_test(&mut self) {
+        self.select_tab(Tab::Apps);
+        self.pending_focus = Some(PendingFocus::Id(ids::TAB_APPS));
+    }
+
+    /// Where what has the focus is on the screen (canvas units), for the platform to grow an
+    /// app out of its banner.
+    pub fn focused_rect_on_screen(&self) -> Option<Rect> {
+        let rect = self.focus.current()?.rect;
+        Some(rect.translate(0.0, -self.current_scroll_y()))
+    }
+
+    /// OK went down or up: what has the focus sinks while it is held (tvOS's pressed state).
+    pub fn set_pressed(&mut self, pressed: bool, now_ms: u64) {
+        let held = self.anim.get(Anim::Press, 0.0, now_ms);
+        let target = if pressed { 1.0 } else { 0.0 };
+        if (held - target).abs() > f32::EPSILON || self.anim.is_animating(now_ms) {
+            self.anim
+                .animate_to(Anim::Press, held, target, now_ms, Some(PRESS));
+        }
+    }
+
     pub fn focus_for_test(&mut self, id: FocusId) -> bool {
         self.focus.focus(id)
     }
@@ -767,12 +952,23 @@ impl LumeApp {
         if let Some(at) = self.splash_deadline() {
             consider(at);
         }
+        // Home settles after a while without keys: that frame has to be asked for.
+        if self.foreground && !self.idle && self.screen == Screen::Main(Tab::Home) {
+            consider(self.last_input_ms + IDLE_AFTER_MS);
+        }
+        // And later it gives the screen to the wallpaper.
+        if let Some(after) = self.ambient_after_ms() {
+            if self.foreground && self.screen == Screen::Main(Tab::Home) {
+                consider(self.last_input_ms + after);
+            }
+        }
         deadline
     }
 
     /// Whether the settings are on screen and so the TV statistics are being read.
     pub fn wants_stats(&self) -> bool {
-        self.foreground && self.screen == Screen::Settings
+        // The statistics card left the settings with their tvOS layout; nothing reads them now.
+        false
     }
 
     /// When the next statistics reading is due, while the settings are on screen.
@@ -874,18 +1070,68 @@ impl LumeApp {
             }
         }
         self.splash_frame_start(now_ms);
-        p.wallpaper_at(
-            self.config.wallpaper,
-            !matches!(self.screen, Screen::Main(Tab::Home) | Screen::ControlCenter),
+        if self.screen == Screen::Main(Tab::Home)
+            && self.foreground
+            && !self.in_splash()
+            && self.dock_move.is_none()
+            && !self.menu_is_open()
+            && self
+                .ambient_after_ms()
+                .is_some_and(|after| now_ms.saturating_sub(self.last_input_ms) >= after)
+        {
+            self.enter_ambient();
+        }
+        // Home shades the picture toward the bottom, where the next row peeks, and steps it back
+        // once the grid is scrolled (from where the scroll is going, so it is one repaint).
+        let veil = match self.screen {
+            Screen::Main(Tab::Home) => {
+                let back = 1.0 - 0.47 * (self.scroll_y / 160.0).clamp(0.0, 1.0);
+                Some((400.0, back, back * 0.49))
+            }
+            // The Control Center dims the picture in the wallpaper's own pass: a veil over the
+            // whole screen would be one more blended layer on every pixel.
+            Screen::ControlCenter => {
+                let keep = if self.control_closing { 1.0 } else { 0.65 };
+                Some((400.0, keep, keep * 0.49))
+            }
+            // Only where the time is read.
+            Screen::Ambient => Some((300.0, 1.0, 0.55)),
+            _ => None,
+        };
+        p.wallpaper_veiled(
+            self.wallpaper_on_screen(),
+            !matches!(
+                self.screen,
+                Screen::Main(Tab::Home) | Screen::ControlCenter | Screen::Ambient
+            ) && !self.previewing_wallpaper(),
             self.wallpaper_reveal(),
+            veil,
+            // Below the fold the picture goes out of focus, as on tvOS.
+            self.screen == Screen::Main(Tab::Home) && self.scroll_y > 0.5,
         );
         self.content_start = p.list.len();
         self.bar_start = None;
+        if self.control_closing
+            && !self
+                .anim
+                .is_animating_where(now_ms, |key| matches!(key, Anim::Control))
+        {
+            self.control_closing = false;
+            self.screen = Screen::Main(self.control_origin);
+            self.pending_focus = Some(PendingFocus::Id(
+                self.control_focus.take().unwrap_or(ids::CONTROL_CENTER),
+            ));
+        }
         match self.screen {
             Screen::Main(Tab::Home) => self.draw_home(p),
             Screen::Main(Tab::Apps) => self.draw_apps(p),
             Screen::Settings => self.draw_settings(p),
-            Screen::ControlCenter => self.draw_control_center(p),
+            Screen::ControlCenter => {
+                // Over Home as it was left, which the veil of the controls dims.
+                self.draw_home(p);
+                self.draw_control_center(p);
+            }
+            Screen::Ambient => self.draw_ambient(p),
             Screen::About => self.draw_about(p),
             Screen::TvInfo => self.draw_tv_info(p),
             Screen::Editor => self.draw_editor(p),
@@ -939,14 +1185,28 @@ impl LumeApp {
             return;
         }
         self.tracked_focus = current;
-        let transition = self.focus_transition();
+        // tvOS: taking the focus is quicker than leaving it, and both are shorter while the focus
+        // runs (a key soon after another), so the picture keeps up with the remote.
+        let pace = if self.now_ms.saturating_sub(self.last_focus_ms) < 300 {
+            0.6
+        } else {
+            1.0
+        };
+        self.last_focus_ms = self.now_ms;
+        let timed = |factor: f32| {
+            self.focus_transition().map(|t| crate::theme::Transition {
+                duration_ms: t.duration_ms * factor,
+                ..t
+            })
+        };
+        let (into, out) = (timed(pace), timed(pace * 1.4));
         if let Some(old) = previous {
             self.anim
-                .animate_to(Anim::Focus(old), 1.0, 0.0, self.now_ms, transition);
+                .animate_to(Anim::Focus(old), 1.0, 0.0, self.now_ms, out);
         }
         if let Some(new) = current {
             self.anim
-                .animate_to(Anim::Focus(new), 0.0, 1.0, self.now_ms, transition);
+                .animate_to(Anim::Focus(new), 0.0, 1.0, self.now_ms, into);
         }
     }
 

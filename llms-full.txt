@@ -9,7 +9,7 @@ Generado desde docs/llm-wiki/ con uv run python scripts/build-llm-wiki.py. Edita
 
 # Wiki LLM · HOME
 
-Esta wiki es el contexto de trabajo para otros agentes. Se compiló el 11 de noviembre de 2026 a partir del código local, las specs y las pruebas en la TCL; no sustituye la lectura del código cuando se cambia una función.
+Esta wiki es el contexto de trabajo para otros agentes. Se actualizó el 16 de noviembre de 2026 (HOME 0.9.7) a partir del código local, las specs y las pruebas en la TCL; no sustituye la lectura del código cuando se cambia una función.
 
 ## Ruta de lectura
 
@@ -19,6 +19,8 @@ Esta wiki es el contexto de trabajo para otros agentes. Se compiló el 11 de nov
 4. [Dispositivo y operaciones](operations.md): compilar, instalar, probar, recuperar.
 5. [Referencias y procedencia](references.md): Lume, TV Home, artículo de AppleInsider, licencias.
 6. [Pendientes y guía de colaboración](next-work.md): riesgos, decisiones abiertas y pruebas futuras.
+7. [Guía de diseño de tvOS (HIG)](tvos-hig.md): lo que Apple publica, diferencias con HOME y lista priorizada de cambios. Estudiada el 2026-11-11; los vídeos solo por transcripción.
+8. [APIs de TCL y Realtek en la 55Q5K](tcl-apis.md): librerías del fabricante que una app puede cargar, sus clases y métodos, y los límites. Úsala antes de dar por imposible un control de la tele.
 
 ## Fuentes de verdad
 
@@ -53,18 +55,20 @@ La idea inicial fue probar `tinulica/tv-home`, después usar el proyecto Rust `d
 
 - Nombre y recursos visuales de HOME, sin marca Lume en la interfaz principal; identificadores internos conservados para las actualizaciones.
 - Tres escenas de playa generadas para esta variante, empaquetadas como QOI con miniaturas. Beach Cove/Cala turquesa es la predeterminada.
-- Home al estilo tvOS: cinco banners por fila, la primera sobre una plataforma de vidrio, nombre solo bajo el banner enfocado; barra superior de vidrio con Apps, entradas, ajustes y reloj.
-- Centro de control de mosaicos de vidrio arriba a la derecha (se abre también con el botón Home estando en Inicio), navegación con D-pad, tarjetas Wi-Fi, Bluetooth, Entradas, Imagen, Sonido, Modo ambiente, Apps y Ajustes. Entradas se oculta si el selector no está disponible.
+- Inicio en dos estados, como tvOS: en reposo el fondo nítido y solo la fila principal en su placa de vidrio contra el borde inferior; Abajo despliega la biblioteca entera sobre el fondo desenfocado. Cinco o seis banners por fila, nombre solo bajo el banner con foco en la biblioteca, cápsula de hora arriba a la derecha. OK largo abre el menú del icono.
+- Centro de control sobre el Inicio atenuado (botón Home en Inicio, o la cápsula): Suspender, Wi‑Fi, Bluetooth, deslizadores de Brillo (retroiluminación real por la librería de TCL) y Volumen que siguen en vivo a la tele, AirPlay, Temporizador y botones redondos para Entradas, Duplicar pantalla, Imagen, Sonido, Ajustes de HOME y Ajustes de Android.
+- Ajustes con la estructura de tvOS (emblema a la izquierda, lista a la derecha), con páginas de Pantalla de inicio y Fondo de pantalla (vista previa a pantalla completa); editor, mapeo de control, información y Acerca de con el mismo estilo.
+- Modo ambiente propio (fondo y hora) y vuelta al punto de partida cada vez que HOME deja la pantalla; volver desde otra app tarda unos 50 ms porque el renderizador se conserva.
 - Traducciones en `values` (inglés), `values-es`, `values-pt-rBR`, `values-id` y `values-ru`; la TV probada usa `es-ES`.
-- APK firmado `0.4.0-tvos` instalado con `adb install -r`. Google TV continúa siendo el Home del sistema; el servicio de accesibilidad `HomeKeyService` hace que el botón Home abra HOME (véase operations.md).
-- Pruebas Rust: 506 aprobadas, 2 ignoradas; verificación del APK: 31.08 MB, ARMv7 y ARM64, 9 recursos QOI de fondos.
+- APK firmado `0.9.7-tvos` instalado con `adb install -r`. Google TV continúa siendo el Home del sistema; el servicio de accesibilidad `HomeKeyService` hace que el botón Home abra HOME (véase operations.md).
+- Pruebas Rust: 494 aprobadas, 2 ignoradas; verificación del APK: ARMv7 y ARM64, 9 fondos QOI.
 - Capturas reales copiadas a `docs/llm-wiki/images/`: Home, barra superior y Centro de control en la TCL. La del panel muestra el rótulo español completo de Modo ambiente.
 
 ## Alcance real
 
 Esto es una app launcher, no una modificación del firmware. No tiene acceso al reproductor de otras apps, a un compositor global de vídeo, a Apple Home, perfiles de Apple TV ni VPN del sistema. El vidrio refracta la textura del fondo de la propia app mediante una muestra de shader; no puede copiar el motor privado de Apple. El launcher del sistema no se toca; el botón Home abre HOME solo mientras el servicio de accesibilidad esté activado.
 
-La tarjeta Sonido y la de Imagen llegan a la misma actividad `DisplaySoundActivity` en este firmware TCL. El acceso heredado llamado Sleep en el código abre **Modo ambiente** en la TCL y se etiquetó así en el Centro de control. El selector de entradas mostró Google TV Home, AirPlay y TV; no había un HDMI activo para probar cambio de fuente.
+Los botones Imagen y Sonido llegan a la misma actividad `DisplaySoundActivity` en este firmware TCL. Qué puede y qué no puede cambiar una app en esta tele está en `tcl-apis.md`. El selector de entradas mostró Google TV Home, AirPlay y TV; no había un HDMI activo para probar cambio de fuente.
 
 
 ---
@@ -82,7 +86,9 @@ La tarjeta Sonido y la de Imagen llegan a la misma actividad `DisplaySoundActivi
 | Ruta | Responsabilidad |
 | --- | --- |
 | `crates/lume-core/src/app/` | Estado de pantallas, D-pad, focus, Home, Apps, Centro de control, ajustes y menús. |
-| `app/home.rs`, `app/apps.rs`, `app/topbar.rs` | Diseño del estante, cuadrícula y barra superior. |
+| `app/home.rs` | Inicio en dos estados (fila principal en reposo, biblioteca desplegada). `app/apps.rs` y `app/topbar.rs` son heredados y ya no tienen entrada desde la interfaz. |
+| `app/control_center.rs`, `app/settings.rs` | Centro de control (deslizadores, temporizador) y Ajustes con estructura de tvOS (`SettingsPage`). |
+| `lume-app/src/android/egl.rs`, `vulkan.rs` | `Graphics`: OpenGL ES por defecto, conservado al salir (`park`/`resume`); Vulkan 1.3 opcional. |
 | `app/control_center.rs` | Panel de vidrio, tarjetas y efectos de accesos directos. |
 | `app/painter.rs`, `render/gles2.rs`, `render/shaders.rs` | Comandos de dibujo, textura del fondo y GLES2. |
 | `ui/animation.rs`, `display.rs`, `shell/` | Animaciones, escala de 1280×720 y bucle de render. |
@@ -98,7 +104,7 @@ La tarjeta Sonido y la de Imagen llegan a la misma actividad `DisplaySoundActivi
 
 - Mantén el `applicationId` `app.lume.tv` y la misma clave de firma si el objetivo es actualizar la app ya instalada y conservar preferencias. Renombrar paquete o firma requiere migración explícita.
 - Usa los efectos existentes (`OpenTvSetting`, `OpenInputs`, `OpenAndroidSettings`) para abrir paneles del sistema. No implementes conjeturas de toggles privilegiados.
-- El foco del Centro de control se calcula por fila y columna; Back vuelve a la pestaña anterior y deja enfocado el botón de control.
+- El foco del Centro de control se calcula por fila y columna; Back lo cierra y devuelve el foco a lo que lo tenía.
 - La app evita animación continua en reposo. El bucle duerme cuando no hay cambio visual; no agregues blur o pasadas a pantalla completa sin medir en la TCL.
 - Las specs de `openspec/specs/` deben registrar una capacidad nueva; el directorio `docs/upstream/` no es especificación de HOME.
 
@@ -123,8 +129,20 @@ Capturas de referencia tomadas en la TCL: [Home](images/home-tcl.png), [barra su
 - **Redibujado parcial**: cada cuadro compara su lista de dibujo con la anterior (`Frame::damage`) y solo repinta el rectángulo que cambió, con `glScissor`, `EGL_EXT_buffer_age` y `EGL_KHR_partial_update` (`draw` en `crates/lume-app/src/android/mod.rs`). Los cambios de textura (iconos, fondo, atlas rehecho) fuerzan un cuadro completo vía `Gles2Backend::take_content_changed`. Es lo que Android hace por TV Home y la razón de que aquel fuera fluido a 1080p.
 - La GPU real de la TCL 55Q5K es **PowerVR BXE-4-32** (OpenGL ES 3.2, Vulkan 1.1). La Mali-470 de `docs/device-notes.md` es la tele del autor de Lume.
 - Foco de banner: 260 ms `cubic-bezier(0.2, 0, 0, 1)`, escala 1,12 con un pequeño rebote, sombra amplia, borde claro de 2 unidades y nombre solo bajo el banner enfocado.
-- Centro de control: mosaicos de vidrio flotantes arriba a la derecha, sin panel; bajan desde la esquina en 240 ms; el mosaico enfocado se vuelve blanco.
-- Medida en TCL (0.3.15, 1080p, navegación por la primera fila con mando virtual `uinput`): mediana 16,7 ms, p95 17,0 ms, 2 intervalos de 33 ms en ~120. Un cuadro completo a 1080p cuesta ~37 ms: lo pagan el desplazamiento vertical y la apertura del Centro de control, que oscurecen o mueven toda la pantalla. Son pruebas puntuales.
+- Vidrio: `Gles2Backend::blur_wallpaper` reduce el fondo dos veces por cuatro al cargarlo (textura de ~120×68) y `GLASS_FRAGMENT` la muestra ampliada con una lente de 12 unidades en el borde y brillo especular arriba-izquierda y abajo-derecha. Una muestra por píxel.
+- Centro de control: mosaicos de vidrio flotantes arriba a la derecha, sin panel; bajan desde la esquina en 240 ms y vuelven en 160 ms; el mosaico enfocado se vuelve blanco.
+- Inicio sin barra de pestañas: cápsula de estado con la hora arriba a la derecha. OK largo (500 ms, temporizado en el bucle de `lume-app` porque la tele no envía repeticiones fiables) abre el menú; al mover un favorito los favoritos tiemblan, lo que repinta toda la primera fila y baja a ~30 cuadros en parte de los intervalos.
+- Las apps se abren con `ActivityOptions.makeScaleUpAnimation` desde el rectángulo del banner.
+- OpenGL ES 3.2 (`egl.rs` prueba 3.2, 3.0 y 2.0). La tele tiene ASTC pero no `EXT_disjoint_timer_query`, así que no hay medida de tiempo de GPU. No se usan texturas comprimidas: el fondo ahorraría ~6 MB y los iconos llegan de Android en tiempo de ejecución; haría falta un codificador en el build.
+- Regla de rendimiento comprobada: en esta GPU cuenta el número de pasadas con mezcla por píxel (no hay descarte de superficies ocultas con `BLEND` activo). Un velo o degradado a pantalla completa es una pasada más del shader de rectángulos; va en el color por vértice del fondo (`Painter::wallpaper_veiled`, `TexturedCmd::fade_to`) o en el tinte del vidrio (`wallpaper_glass_tinted`). Un anillo también sombrea todo su rectángulo.
+- El programa de texto debe nombrar todos los atributos del shader de vértices compartido en `link`; si no, `a_params` cae en la ranura de otro dato y los glifos salen deformados.
+- **Diseño objetivo en Figma (2026-11-15).** https://www.figma.com/design/2NhgcRgKySPuCRAOaEs2v7 reúne todas las vistas (Inicio, Centro de control, Ajustes, ambiente, movimiento y tabla de APIs). Implementado en 0.9.0: Inicio en dos estados (`app/home.rs`: `TOP` en reposo, `UNFOLDED_TOP` desplegado; el desenfoque y el oscurecido salen de `scroll_y` en `app/mod.rs`) y el panel principal del Centro de control (`app/control_center.rs`). En 0.9.1: Ajustes con la estructura de tvOS (`app/settings.rs`: `SettingsPage` con las páginas Raíz, Pantalla de inicio y Fondo de pantalla dentro de `Screen::Settings`; el fondo en pantalla sale de `wallpaper_on_screen`, que en la página de fondos es el de la fila con foco). En 0.9.2–0.9.7: un solo estilo en todas las pantallas (título centrado de `page::draw_header`, foco blanco con sombra en `theme.css`), modo ambiente propio (`Screen::Ambient`, tiempo en `HomeConfig::ambient_minutes`), Centro de control sobre el Inicio atenuado (el oscurecido va en la pasada del fondo: un velo a pantalla completa costaba 12 cuadros lentos de 122), brillo real por la API de TCL y lectura en vivo de volumen y brillo, y vuelta al punto de partida al salir (`went_to_background` llama a `go_home`). Descartado por límites de la plataforma (véase `tcl-apis.md`): subpaneles de Wi‑Fi, Bluetooth y sonido que cambien algo (una app no puede), brillo automático en este modelo (la tele ignora la orden) y cambio de modo de imagen (la tabla de valores no se conoce). Pendiente real: aviso previo del temporizador y fecha en el modo ambiente. La pestaña Apps antigua (`app/apps.rs`) ya no es alcanzable desde la interfaz, pero su código y sus pruebas siguen.
+- **El renderizador se conserva al salir (2026-11-15).** `Graphics::park`/`resume` (`android/egl.rs`) destruyen solo la superficie EGL; `Shell::sleep(true)` conserva glifos e iconos y `wake` no lanza el splash. `MainEvent::LowMemory` suelta todo (`Shell::release_buffers`). `Shell::is_active` pasa a depender de `display`, no del motor de texto, para que el bucle no gire en segundo plano. Coste: ~51 MB de memoria gráfica retenida. El motor Vulkan no se conserva.
+- **Vulkan 1.3 probado, OpenGL ES por defecto (2026-11-15).** Tras la actualización a Android 14 la GPU expone Vulkan 1.3.246. Existe un motor Vulkan completo (`android/vulkan.rs`; `Graphics` en `android/egl.rs` elige uno de los dos) que se activa con `setprop debug.lume.renderer vulkan`. Medido con el mismo APK y las mismas teclas: navegación, desplazamiento y Centro de control dan 16,7 ms de mediana con ambos, y los intervalos lentos (5–7 de ~125) son los mismos, casi todos el primer cuadro tras una pausa. Con dos imágenes de swapchain (el mínimo) Vulkan iba peor (p95 de 33 ms); necesita tres. El arranque en frío de Vulkan añade unos 0,6 s (carga de `libvulkan` y del dispositivo) frente a 0,06–0,1 s al volver a la app. El límite de esta tele es la tasa de relleno, igual con las dos API, y la propia interfaz del sistema usa OpenGL: no cambies el motor por defecto sin una medición que muestre una ganancia.
+- **4K descartado (2026-11-11).** Pidiendo un buffer de 3840×2160 a la ventana (el doble de su tamaño; SurfaceFlinger lo acepta) y escala 3, con el atlas de iconos limitado a escala 1,5: navegación 27 intervalos de 25 ms o más en ~120, desplazamiento 33,3 ms de mediana, Centro de control 32,9 ms. El redibujado parcial no compensa cuatro veces más píxeles en esta GPU. Se queda en 1920×1080.
+- Medida en TCL con 0.6.0 (mando virtual, 600–700 ms entre teclas): navegación, desplazamiento vertical y Centro de control a 16,6 ms de mediana y 17,0 ms de p95, sin intervalos de 25 ms o más. Con 0.5.1 el desplazamiento medía 33,3 ms de mediana.
+- Medida en TCL con 0.5.0: mediana 16,7 ms, p95 17,0 ms, máximo 17,0 ms, ningún intervalo lento en ~120.
+- Medida anterior (0.3.15, 1080p, navegación por la primera fila con mando virtual `uinput`): mediana 16,7 ms, p95 17,0 ms, 2 intervalos de 33 ms en ~120. Un cuadro completo a 1080p cuesta ~37 ms: lo pagan el desplazamiento vertical y la apertura del Centro de control, que oscurecen o mueven toda la pantalla. Son pruebas puntuales.
 - Para medir, deja al menos 600 ms entre teclas: las pausas menores de 100 ms entre animaciones se confunden con cuadros lentos. `adb shell input keyevent` arranca una VM por tecla y ensucia la medida; usa `adb shell uinput`.
 
 ## Faltas conocidas respecto a tvOS
@@ -142,7 +160,7 @@ Las specs de `openspec/specs/design-system/spec.md` heredaron reglas del tema or
 
 ## Equipo probado
 
-TCL 55Q5K, Google TV con Android 12/API 31, ABI `armeabi-v7a`, SoC Realtek rtd6748, GPU PowerVR BXE-4-32 (OpenGL ES 3.2, Vulkan 1.1, `EGL_KHR_partial_update`), pantalla 4K con UI a 1920×1080, plataforma G10, firmware `V8-0008T01-LF1V521`, LAN `192.168.0.229`. La IP puede cambiar. El launcher del sistema es `com.google.android.apps.tv.launcherx/.home.HomeActivity`; HOME es `app.lume.tv/.LumeActivity`.
+TCL 55Q5K, Google TV con Android 14/API 34 desde la actualización del 2026-11-15 (antes Android 12/API 31), ABI `armeabi-v7a`, SoC Realtek rtd6748, GPU PowerVR BXE-4-32 (OpenGL ES 3.2, Vulkan 1.1, `EGL_KHR_partial_update`), pantalla 4K con UI a 1920×1080, plataforma G10, firmware `V8-0008T01-LF1V521`, LAN `192.168.0.229`. La IP puede cambiar. El launcher del sistema es `com.google.android.apps.tv.launcherx/.home.HomeActivity`; HOME es `app.lume.tv/.LumeActivity`.
 
 ## Datos privados fuera del repositorio
 
@@ -154,18 +172,18 @@ TCL 55Q5K, Google TV con Android 12/API 31, ABI `armeabi-v7a`, SoC Realtek rtd67
 cd ~/Projects/clean-tv-os
 docker run --rm -v "$PWD:/src" -w /src lume-toolchain:latest sh -lc 'cargo fmt --all && cargo test -q -p lume-core'
 set -a; source ~/Projects/.clean-tv-os-private/signing/credentials.env; set +a
-LUME_VERSION_NAME=v0.4.0-tvos scripts/container-build.sh release
-uv run python scripts/verify-apk.py dist/lume-0.4.0-tvos-release.apk
+LUME_VERSION_NAME=v0.9.7-tvos scripts/container-build.sh release
+uv run python scripts/verify-apk.py dist/lume-0.9.7-tvos-release.apk
 ```
 
-Para un cambio nuevo, aumenta la versión por encima de 400 en `LUME_VERSION_NAME`. El script empaqueta ARMv7 y ARM64 y genera APK/AAB en `dist/`. Comprueba que muestra firma de release; sin `LUME_KEYSTORE` produce un APK firmado con la clave de debug, que no actualiza la instalación actual. `dist/` está ignorado por Git: el APK final se copió localmente, pero otros agentes deben reconstruirlo si clonan el repositorio.
+Para un cambio nuevo, aumenta la versión por encima de 907 en `LUME_VERSION_NAME`. El script empaqueta ARMv7 y ARM64 y genera APK/AAB en `dist/`. Comprueba que muestra firma de release; sin `LUME_KEYSTORE` produce un APK firmado con la clave de debug, que no actualiza la instalación actual. `dist/` está ignorado por Git: el APK final se copió localmente, pero otros agentes deben reconstruirlo si clonan el repositorio.
 
 ## ADB y pruebas manuales
 
 ```sh
 adb connect 192.168.0.229:5555
 adb -s 192.168.0.229:5555 devices
-adb -s 192.168.0.229:5555 install -r dist/lume-0.4.0-tvos-release.apk
+adb -s 192.168.0.229:5555 install -r dist/lume-0.9.7-tvos-release.apk
 adb -s 192.168.0.229:5555 shell am start -n app.lume.tv/.LumeActivity
 adb -s 192.168.0.229:5555 shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME
 adb -s 192.168.0.229:5555 exec-out screencap -p > /tmp/home-check.png
@@ -179,14 +197,68 @@ En HOME, pulsa Arriba para mostrar la barra, desplázate hasta el icono de Centr
 
 ```sh
 # Activar HOME como inicio
-adb -s 192.168.0.229:5555 shell appops set app.lume.tv APP_AUTO_START allow
+adb -s 192.168.0.229:5555 shell appops set app.lume.tv AUTO_START allow   # APP_AUTO_START en el firmware Android 12
 adb -s 192.168.0.229:5555 shell settings put secure enabled_accessibility_services app.lume.tv/app.lume.tv.HomeKeyService
 adb -s 192.168.0.229:5555 shell settings put secure accessibility_enabled 1
 # Volver a Google TV
 adb -s 192.168.0.229:5555 shell settings put secure enabled_accessibility_services null
 ```
 
-También se puede apagar en Ajustes > Sistema > Accesibilidad > HOME. `adb shell input keyevent KEYCODE_HOME` **no** pasa por el filtro de accesibilidad y siempre abre Google TV; para probar sin el mando usa `adb shell uinput` con un dispositivo virtual (KEY_HOMEPAGE = 172). Comprobado el 2026-11-11 con uinput; encendido desde reposo y reinicio en frío sin comprobar, y el firmware puede desactivar el servicio por su cuenta.
+También se puede apagar en Ajustes > Sistema > Accesibilidad > HOME. `adb shell input keyevent KEYCODE_HOME` **no** pasa por el filtro de accesibilidad y siempre abre Google TV; para probar sin el mando usa `adb shell uinput` con un dispositivo virtual (KEY_HOMEPAGE = 172). La actualización de firmware a Android 14 (`UTT2.250416.001`, 2026-11-15) borró la autorización ADB de la Mac y dejó el app-op, ahora llamado `AUTO_START`, en `ignore`; hubo que aceptar de nuevo la depuración en la tele y repetir el primer comando. Apps deshabilitadas, DNS privado y app-ops de `com.tcl.ttvs` sobrevivieron. Comprobado el 2026-11-11 y el 2026-11-15 con uinput; encendido desde reposo y reinicio en frío sin comprobar, y el firmware puede desactivar el servicio por su cuenta.
+
+## Brillo, suspensión y animaciones del sistema (2026-11-15)
+
+A petición del usuario, para el Centro de control y la fluidez general:
+
+```sh
+# Respaldo para otras marcas. En esta TCL ese ajuste NO mueve el panel: HOME usa TvBacklightManager de com.tcl.tv.display (véase tcl-apis.md)
+adb -s 192.168.0.229:5555 shell appops set app.lume.tv WRITE_SETTINGS allow
+# Transiciones de Android a la mitad. No pongas animator_duration_scale a 0: HOME lo lee como «reducir movimiento»
+adb -s 192.168.0.229:5555 shell settings put global window_animation_scale 0.5
+adb -s 192.168.0.229:5555 shell settings put global transition_animation_scale 0.5
+adb -s 192.168.0.229:5555 shell settings put global animator_duration_scale 0.5
+# Deshacer
+adb -s 192.168.0.229:5555 shell appops set app.lume.tv WRITE_SETTINGS default
+for k in window_animation_scale transition_animation_scale animator_duration_scale; do adb -s 192.168.0.229:5555 shell settings put global $k 1.0; done
+```
+
+«Suspender» y el temporizador usan `performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)` de `HomeKeyService`: solo funcionan con ese servicio activado. Comprobado: la tele pasa a `Asleep` y `KEYCODE_WAKEUP` devuelve HOME. Pantallas que abre el Centro de control: AirPlay (`com.realtek.media.airplay2.LAUNCH_SETTINGS`), Miracast (`com.tcl.miracast.test.MAINMENU`), imagen (`android.settings.DISPLAY_SETTINGS` → `com.tcl.settings.PictureActivity`), sonido (`DisplaySoundActivity`). No son escribibles por una app: modo de imagen y de sonido (claves TCL), encender/apagar Wi‑Fi, conectar auriculares Bluetooth (API privilegiada). La tele no expone sensor de luz a Android: el brillo automático solo existe en el panel de imagen de TCL.
+
+Para medir: `scratchpad/measure.sh` descarta intervalos de más de 100 ms (las pausas entre animaciones no son cuadros lentos).
+
+## Apps de fábrica deshabilitadas (2026-11-11)
+
+A petición del usuario se deshabilitaron para el usuario 0, con `pm disable-user --user 0`, veinte paquetes (el usuario volvió a habilitar después Prime Video; quedan 19) de promoción, demostración o preinstalados. Nada se borra de la partición del sistema. Comprobado después: Ajustes, Imagen/Sonido, panel de Entradas y HOME abren sin cierres en el registro. **Sin comprobar:** reinicio de la tele (el puerto de ADB por red no es persistente, `persist.adb.tcp.port` está vacío, así que no se reinició por ADB) y una fuente HDMI real.
+
+```sh
+# Volver a habilitar todo
+for p in com.tcl.waterfall.overseas com.tcl.channelplus com.tcl.dashboard com.tcl.messagebox \
+  com.tcl.usercenter com.tcl.tv.tclhome_passive com.tcl.interactive com.tcl.exhibit \
+  com.tcl.esticker com.tcl.hotelmenu com.tcl.repairguide com.tcl.ocean.instructions \
+  com.tcl.logkit com.tcl.smartalexa com.tcl.t_solo com.tcl.hearaid \
+  com.amazon.amazonvideo.livingroom com.google.android.youtube.tvmusic \
+  com.google.android.videos com.google.android.play.games; do
+  adb -s 192.168.0.229:5555 shell pm enable $p
+done
+```
+
+No tocar: `com.tcl.tvinput`, `com.tcl.tv`, `com.tcl.systemserver`, `com.tcl.providers.config`, `com.realtek.*`, `com.tcl.autopair`, `com.tcl.UpdatePeripheral`, `com.tcl.inputmethod.international`, `com.tcl.ttvs`, `com.tcl.guard`, `com.tcl.suspension`, `com.tcl.android.webview`. Si se deshabilita `com.google.android.apps.tv.launcherx`, el inicio pasaría a `com.google.android.tungsten.setupwraith/.RecoveryActivity` (prioridad 1) y no a HOME (prioridad 0): probarlo con el comando de vuelta preparado.
+
+## Privacidad (2026-11-11)
+
+A petición del usuario:
+
+- **DNS privado con filtro de anuncios y rastreo** (AdGuard). Comprobado: `google.com` resuelve y `doubleclick.net` queda bloqueado.
+- **`com.tcl.ttvs` sin estadísticas de uso, ubicación ni micrófono** (app-ops en `ignore`). Ese paquete mezcla telemetría (`BIService`, `TrackDataService`, `UsagestService`, Samba TV) con actualización del sistema, envío de pantalla y ajustes del menú, así que no se deshabilita entero. `pm disable` de sus componentes falla («Shell cannot change component state»). **No hagas `am force-stop com.tcl.ttvs`**: no vuelve a arrancar solo; se recupera con `am startservice -n com.tcl.ttvs/.CoreService`.
+
+```sh
+# Deshacer
+adb -s 192.168.0.229:5555 shell settings put global private_dns_mode opportunistic
+adb -s 192.168.0.229:5555 shell settings delete global private_dns_specifier
+for op in GET_USAGE_STATS FINE_LOCATION COARSE_LOCATION RECORD_AUDIO; do
+  adb -s 192.168.0.229:5555 shell appops set com.tcl.ttvs $op default
+done
+```
 
 ## Rollback
 
@@ -225,21 +297,762 @@ El nombre y marca Lume no forman parte de la identidad visible de HOME. El paque
 
 ## Estado antes de iniciar cambios
 
-El trabajo vive en `main` de `noecamacho/clean-tv-os`. El APK de `dist/` no se versiona. No hagas commit o push sin que el usuario lo solicite.
+El trabajo vive en `noecamacho/clean-tv-os`; los cambios de 0.5.0 a 0.9.7 se subieron en la rama `tvos-0.9.7`. El APK de `dist/` no se versiona. No hagas commit o push sin que el usuario lo solicite.
 
-## Pendientes verificables
+## Pendientes verificables (a 2026-11-16, HOME 0.9.7)
 
-1. Hacer una revisión visual en la TV con el usuario: proporciones de la barra y panel, iconografía y sensación del foco. Hay una captura final documentada, pero la semejanza exacta con tvOS 26 sigue siendo subjetiva.
-2. Medir navegación prolongada, arranque y memoria en la versión 0.3.9 si se cambia el render. Las medidas actuales son muestras puntuales.
-3. Probar una entrada HDMI cuando haya una fuente conectada. Solo se verificó que se abre el panel TCL.
-4. La tarjeta Sonido llega al mismo menú de Imagen en este firmware. Podría ofrecer un acceso más específico si se encuentra una actividad estable que exista realmente en el DEX de esta TCL.
-5. Revisar las specs heredadas y la pantalla Acerca de antes de cualquier distribución. Hay textos/README upstream archivados y nombres internos Lume que no deben cambiarse sin un plan de migración.
-6. Perfiles, VPN, automatización de hogar, energía y temporizador: primero comprobar permisos/APIs reales en Android 12 TCL. No mostrar un botón que lleve a una acción diferente de la etiqueta.
-
-7. Diseño tvOS pendiente: quitar la barra superior con pestañas (tvOS no la tiene), modo edición con temblor para reordenar con el D-pad, vidrio con fondo pre-difuminado, y animación de cierre del Centro de control.
-8. Controles directos: Wi-Fi/Bluetooth solo abren ajustes (Android 12 con `targetSdk` 36 no deja alternarlos); `tcl_sys_audio_sound_mode` existe en `Settings.System` pero no se ha probado que escribirlo cambie el audio; no se encontró clave de modo de imagen ni de brillo.
-9. `HomeKeyService`: probar encendido desde reposo y arranque en frío, y si el firmware desactiva el servicio.
+1. **Comprobar con el mando físico y a simple vista**, que nunca se han probado: el botón Home real, el encendido desde reposo y el arranque en frío (¿sigue activo `HomeKeyService`? ¿aparece HOME?), que el deslizador de Brillo se vea cambiar en el panel (por registro y lectura sí cambia), que el temporizador suspenda al vencer, y que el modo ambiente arranque solo tras el tiempo elegido (el salvapantallas de Google TV puede adelantarse).
+2. **Aviso previo del temporizador.** HOME no puede dibujar sobre otra app; haría falta una notificación o una ventana superpuesta con permiso.
+3. **Fecha en el modo ambiente.** Exige nombres de días y meses en los cinco idiomas.
+4. **Modo de imagen desde HOME.** `TvPqManager.setPictureMode` es accesible, pero no se conoce qué entero es cada modo (el actual se lee como 10). Averiguarlo cambiando el modo en el menú de la tele y leyendo `getPictureMode()`; véase `tcl-apis.md`.
+5. **Otras lecturas de `tcl-apis.md` sin probar en ejecución:** luz azul baja, MEMC, modo juego, lista de entradas (`TTvInputMgr`), datos del dispositivo (`tromlib`). La lista completa está en su sección «Sin comprobar».
+6. **Código heredado sin entrada desde la interfaz:** `app/apps.rs` (pestaña Apps), `app/topbar.rs`, gran parte de `app/dock.rs`, `return_point` y `restore` en `app/mod.rs` (HOME ya no restaura el lugar al volver) y la lectura de estadísticas (`stats`, `wants_stats` devuelve `false`). Varias pruebas llegan a Ajustes a través de la pestaña Apps (`open_apps`); al borrar hay que reescribirlas.
+7. **Specs heredadas en portugués** (`launcher-shell`, `device-stats`, `apps-screen`, `home-editor`…) describen el upstream. La spec viva de este fork es `home-screen`; armonizar o archivar las demás.
+8. **Reordenación libre y carpetas, búsqueda, Top Shelf** (puntos 13 a 15 de `tvos-hig.md`). Top Shelf no es viable: las tablas de «seguir viendo» exigen `ACCESS_ALL_EPG_DATA`.
+9. **Compilación anticipada (AOT)** de Max y Apple TV: `cmd package compile -m speed -f` no cambió su estado (`verify`); Prime Video sí quedó en `speed`.
+10. **Probar una entrada HDMI real** y medir sesiones largas (memoria retenida con el renderizador conservado: ~73 MB PSS).
+11. **Otros idiomas.** Solo se ha visto la interfaz en español; inglés, portugués, indonesio y ruso se actualizaron sin verlos en pantalla.
 
 ## Reglas de colaboración
 
 Trabaja en cambios pequeños y explica qué se cambió, por qué, qué pruebas se hicieron y qué no pudo probarse. Actualiza `openspec/specs/` y la página de wiki pertinente si cambia una decisión duradera. Regenera el contexto compilado con `uv run python scripts/build-llm-wiki.py` y comprueba `git diff --check` al terminar. La UI y respuesta al usuario deben ser españolas o seguir el idioma del sistema; conserva inglés como fallback. Evita publicar APKs o repositorios sin instrucción del usuario.
+
+
+---
+
+<!-- source: docs/llm-wiki/tvos-hig.md -->
+
+# Guía de diseño de tvOS (HIG) para HOME
+
+Consultado el 2026-11-11. Resumen de lo más importante:
+
+1. La rejilla de HOME ya coincide con la de Apple: la rejilla de cinco columnas del HIG es 320 pt de ancho + 40 pt de separación con 80 pt de margen lateral, es decir 213,3 + 26,7 y 53,3 unidades de HOME (HOME usa 212 + 28 y 54). La escala de foco 1,12 cae dentro de lo que Apple deja deducir de sus tablas de Top Shelf (1,09 a 1,14).
+2. Apple **no publica** duraciones, curvas, factor de escala de foco, radios de esquina ni sombras de tvOS. Solo publica reglas cualitativas: el foco se comunica con escala, elevación, iluminación y movimiento, nunca solo con color; enfocar es más rápido que desenfocar; todo se acelera si el foco se mueve deprisa.
+3. Lo que más falta en HOME y es barato: el estado de inactividad («el contenido sin foco se atenúa y el elemento enfocado se expande»), el estado de pulsación, los ajustes de accesibilidad (reducir movimiento, reducir transparencia, aumentar contraste, texto grande) y el sonido de foco con paneo y volumen según velocidad.
+4. Liquid Glass es para la capa de controles y navegación, no para el contenido; Apple solo lo activa en Apple TV 4K de 2.ª generación o posterior y deja el aspecto anterior en equipos más viejos. La aproximación estática de HOME es coherente con esa degradación.
+5. tvOS 27 no cambia el diseño del Home: añade tamaño de texto del sistema (Dynamic Type), barras laterales en Música y Podcasts, y un regulador de Liquid Glass de «ultraclaro» a «totalmente tintado». Top Shelf, carpetas, cambio de apps y perfiles siguen siendo las grandes ausencias de HOME, y varias chocan con límites de Android.
+
+Etiquetas: `[A]` documento de Apple (se indica la página), `[V]` transcripción de una sesión (se indica cuál), `[I]` inferencia propia. Las conversiones a unidades de HOME dividen los puntos de Apple (lienzo 1920×1080 pt) entre 1,5 (lienzo 1280×720).
+
+## Fuentes
+
+Las páginas del HIG se leyeron por el JSON `https://developer.apple.com/tutorials/data/design/human-interface-guidelines/<slug>.json`; funcionó para todas menos dos. La URL pública es `https://developer.apple.com/design/human-interface-guidelines/<slug>`. No se vio ninguna imagen ni vídeo: de las figuras solo se leyó el texto alternativo.
+
+### HIG
+
+| Página (slug) | Qué se leyó |
+|---|---|
+| `designing-for-tvos`, `focus-and-selection`, `layout`, `materials`, `motion`, `top-shelf`, `remotes`, `app-icons`, `images`, `lockups`, `collections`, `image-views` | JSON completo |
+| `context-menus`, `alerts`, `loading`, `launching`, `progress-indicators`, `digit-entry-views`, `feedback` | JSON completo |
+| `typography`, `color`, `dark-mode`, `accessibility`, `menus`, `tab-bars`, `buttons`, `playing-audio`, `playing-video`, `scroll-views` | JSON; secciones de tvOS completas y las secciones generales relevantes (tablas de tvOS, Liquid Glass color, contraste, tamaños de control, buenas prácticas). No se leyeron las secciones de otras plataformas |
+| `icons`, `sf-symbols`, `sidebars`, `lists-and-tables`, `text-fields`, `search-fields`, `virtual-keyboards`, `sheets`, `action-sheets`, `popovers`, `modality`, `searching`, `entering-data`, `onboarding`, `settings`, `segmented-controls`, `page-controls`, `pickers`, `toggles`, `split-views`, `labels`, `text-views`, `boxes`, `game-controls`, `live-viewing-apps`, `notifications`, `managing-accounts`, `going-full-screen`, `right-to-left`, `privacy`, `writing`, `inclusion`, `shareplay`, `airplay`, `voiceover`, `sign-in-with-apple`, `branding`, `activity-rings`, `rating-indicators`, `siri`, `pull-down-buttons`, `pop-up-buttons`, `live-photos`, `components`, `foundations`, `patterns` | JSON; solo la sección de tvOS y las líneas que mencionan tvOS, Apple TV, Siri Remote o foco. Muchas dicen únicamente «No additional considerations for tvOS» |
+| `in-app-purchase`, `tv-provider-authentication` | No accesibles: el JSON devolvió 404 con esos slugs |
+
+### Documentación de desarrollador y guía de usuario de Apple
+
+| URL | Qué se leyó |
+|---|---|
+| `developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass` | JSON; menciones a tvOS y foco |
+| `developer.apple.com/documentation/swiftui/creating-a-tvos-media-catalog-app-in-swiftui` | JSON completo |
+| `developer.apple.com/documentation/uikit/about-focus-interactions-for-apple-tv`, `.../uikit/adding-user-focusable-elements-to-a-tvos-app`, `.../uikit/uifocusanimationcoordinator`, `.../uikit/uifocusmovementhint`, `.../uikit/uiimageview/adjustsimagewhenancestorfocused`, `.../swiftui/hovereffect/highlight`, `.../swiftui/hovereffect/lift` | JSON completo (son páginas cortas) |
+| `developer.apple.com/documentation/xcode/configuring-your-app-icon` | JSON; menciones a tvOS |
+| `developer.apple.com/documentation/tvos-release-notes/tvos-26-release-notes` y `tvos-27-release-notes` | JSON; búsqueda por palabras clave. No contienen cambios de diseño del Home |
+| `support.apple.com/guide/tv/…/tvos` (guía de usuario de Apple TV 4K, edición tvOS 27): navegar, reordenar apps, abrir una app, cambiar de app, Centro de control (navegar, ajustes generales, iconos de pestaña, iconos de estado), salvapantallas (activar, configurar, ajustes), apariencia, tamaño de texto, luz y color, ajustes del mando, encender y apagar, perfiles, notificaciones, Buscar, novedades de tvOS 27 | HTML; texto completo de cada página. Mi extractor descartó las líneas de menos de 26 caracteres, así que faltan algunos pasos cortos y los nombres de botones dibujados como icono |
+| `apple.com/newsroom/2025/06/apple-tv-brings-a-beautiful-redesign-and-enhanced-home-entertainment-experience/` | HTML; texto completo |
+| `apple.com/newsroom/2025/06/apple-introduces-a-delightful-and-elegant-new-software-design/` | HTML; párrafos sobre diseño |
+| `apple.com/newsroom/2026/09/major-updates-for-apples-software-platforms-are-now-available/` | HTML; párrafos sobre diseño y Apple TV |
+
+### Sesiones (transcripciones)
+
+URL: `https://developer.apple.com/videos/play/wwdcAAAA/NNN/` salvo que se indique otra.
+
+| Sesión | Qué se leyó |
+|---|---|
+| WWDC25 219, «Meet Liquid Glass» | Transcripción completa |
+| WWDC25 356, «Get to know the new design system» | Transcripción: primera mitad completa; el resto solo buscando tvOS (no aparece) |
+| WWDC26 221, «Prepare your tvOS apps for Dynamic Type» | Transcripción completa |
+| WWDC20 10042, «Build SwiftUI apps for tvOS» (enlazada desde `designing-for-tvos`) | Transcripción completa |
+| WWDC19 211, «Mastering the Living Room With tvOS» (enlazada desde `top-shelf`) | Transcripción; párrafos sobre Top Shelf, foco, pantalla completa y barra de pestañas |
+| WWDC18 803, «Designing Fluid Interfaces» | Transcripción; frases sobre muelles, interrupción, inercia y Apple TV |
+| WWDC23 10158, «Animate with springs» | Transcripción; frases sobre duración y rebote |
+| WWDC17 803, «Designing Sound» | Transcripción; pasaje sobre los sonidos de transición de Apple TV |
+| WWDC23 10162, «The SwiftUI cookbook for focus» | Transcripción; párrafos sobre tvOS |
+| WWDC21 10023, «Direct and reflect focus in SwiftUI» | Transcripción; solo menciones a tvOS |
+| WWDC23 10078, «Design considerations for vision and motion» (enlazada desde `motion`) | Transcripción; frases sobre movimiento. Trata de visionOS |
+| WWDC24 10145, «Enhance your UI animations and transitions» (enlazada desde `motion`) | Transcripción; frases sobre la transición de zoom. Trata de iOS |
+| WWDC25 323 y 284, «Build a SwiftUI/UIKit app with the new design» | Transcripción; solo menciones a TV (hablan de la app TV en iOS) |
+| WWDC25 220, «Say hello to the new look of app icons»; WWDC26 250, «Principles of great design»; WWDC26 269, «What’s new in SwiftUI»; WWDC26 278, «Modernize your UIKit app» | Transcripción; búsqueda de tvOS sin resultados útiles |
+| WWDC25 102 y WWDC26 102, «Platforms State of the Union» | Transcripción; búsqueda de tvOS sin resultados útiles |
+| WWDC26 101, Keynote | Transcripción; tvOS solo se nombra de pasada, sin detalle |
+| WWDC25 101, Keynote | No accesible: la página no trae transcripción |
+| WWDC17 224, «Focus Interaction in tvOS 11» | Apple ya no publica la página (redirige al índice). Leída en el espejo de terceros `asciiwwdc.com/2017/sessions/224`: frases sobre animación y sonido de foco |
+| WWDC16 215, «Focus Interaction on tvOS»; WWDC16 210, «Mastering UIKit on tvOS»; WWDC17 209, «What’s New in tvOS» | Igual: retiradas por Apple, leídas por palabras clave en `asciiwwdc.com` |
+| WWDC20 10640, WWDC23 10073 y 10076 (enlazadas desde `focus-and-selection`) | No leídas: tratan del puntero de iPadOS y de visionOS |
+
+No existe una sesión «What’s new in tvOS» ni una sesión de diseño de tvOS en los índices de WWDC25 y WWDC26; la única sesión de tvOS de WWDC26 es la 221.
+
+## Lo que dice Apple
+
+### Foco
+
+- `[A]` (`focus-and-selection`) En tvOS enfocar no selecciona: «selection requires a separate gesture». tvOS usa el efecto de paralaje «to give the focused item an appearance of depth and liveliness».
+- `[A]` (`focus-and-selection`) Cinco estados visualmente distintos. Según el texto y las figuras de Apple:
+  - **Unfocused**: menos prominente; sombra pequeña, fondo translúcido teñido por el contenido, texto de alto contraste.
+  - **Focused**: «elevation to the foreground, illumination, and animation»; más grande, sombra más lejana, fondo blanco opaco y etiqueta negra (en un botón).
+  - **Highlighted** (se está pulsando): «instant visual feedback»; mismo tamaño que sin foco, fondo blanco opaco; un botón puede «briefly invert its colors and animate».
+  - **Selected**: mismo tamaño que sin foco, fondo blanco opaco, sombra pequeña.
+  - **Unavailable**: sin sombra, translúcido, texto de bajo contraste; no se puede enfocar.
+- `[A]` (`focus-and-selection`) «Because focusing an item often increases its scale», hay que dar recursos nítidos al tamaño enfocado y cuidar que el elemento ampliado no invada lo que lo rodea.
+- `[A]` (`color`, tvOS) «Avoid using only color to indicate focus. Subtle scaling and responsive animation are the primary ways to denote interactivity».
+- `[A]` (`focus-and-selection`) No mover el foco sin acción de la persona. Excepción: si el elemento enfocado desaparece y la entrada es direccional, pasar el foco a un vecino a un paso de distancia.
+- `[A]` (`focus-and-selection`) Todo elemento en pantalla debe poder recibir foco con movimientos direccionales. No mostrar puntero. En pantalla completa los gestos actúan sobre el contenido, no sobre el foco.
+- `[A]` (`uikit/about-focus-interactions-for-apple-tv`) Solo un elemento enfocado a la vez. Si no hay nada enfocable en la dirección pedida, el foco no cambia. Algunos elementos, como las barras de pestañas, se seleccionan solos «after a slight delay».
+- `[A]` (`uikit/adding-user-focusable-elements-to-a-tvos-app`) Al arrancar se enfoca el elemento superior izquierdo (superior derecho en idiomas de derecha a izquierda). Disponer los elementos en rejilla es la forma más segura de que el foco se mueva bien.
+- `[A]` (`uikit/uifocusanimationcoordinator`) «focusing animations typically run faster than unfocusing animations, to create a trail effect»; «when focus is moving quickly, the timing of the animations are sped up». No se debe suponer una duración fija.
+- `[A]` (`swiftui/hovereffect/highlight`) El efecto para imágenes aplica «a projection effect accompanied with a specular highlight» y paralaje ajustando la matriz de proyección y el desplazamiento del brillo. El efecto `lift` (botones y texto) escala y añade sombra.
+- `[A]` (`swiftui/creating-a-tvos-media-catalog-app-in-swiftui`) El lockup estándar da «lift, a specular highlight, and gimbal motion effects»; el título del botón y los títulos de sección cercanos «automatically move out of the way» cuando la imagen crece. El estilo `card` da un plato y un movimiento más sutil para contenido denso.
+- `[A]` (`lockups`) Los carteles ocultan título y subtítulo hasta recibir foco. Los botones con leyenda se inclinan siguiendo el gesto: arriba y abajo en vertical, izquierda y derecha en horizontal, en ambos ejes en rejilla.
+- `[A]` (`images`) «After a period of inactivity, out-of-focus content dims and the focused element expands». «Parallax is designed to be almost unnoticeable».
+- `[V]` (WWDC16 210, espejo) Las imágenes enfocadas tienen un estado pulsado con aspecto hundido («smooshed-in»), activable con `isHighlighted`.
+- `[V]` (WWDC20 10042) El foco inicial es el elemento más arriba o más al inicio de la pantalla. Los menús contextuales se invocan con pulsación larga.
+- `[V]` (WWDC18 803) El motor de foco de Apple TV es un ejemplo de respuesta continua: el movimiento del dedo se refleja de forma continua antes de que el foco salte.
+- Apple no publica este valor: factor de escala de foco, duración y curva de la animación, radio y opacidad de la sombra, ángulo máximo de inclinación, tiempo de inactividad antes de atenuar.
+- `[I]` De las tablas de Top Shelf (tamaño sin foco frente a tamaño enfocado) sale una escala de 1,09 (16:9: 782→852 pt), 1,14 (cuadrado: 500→570 pt) y 1,11 en altura (banner: 560→620 pt). No es un valor que Apple declare como «escala de foco».
+
+### Layout y rejilla
+
+- `[A]` (`layout`, tvOS) Zona segura: 60 pt arriba y abajo, 80 pt a los lados (40 y 53,3 unidades de HOME), por el overscan.
+- `[V]` (WWDC19 211) La sesión dice 90 pt a los lados y 60 pt arriba y abajo (60 y 40 unidades). Contradice al HIG en el margen lateral; el HIG es la fuente más reciente.
+- `[A]` (`layout`, tvOS) Rejillas recomendadas. Separación horizontal siempre 40 pt (26,7 u); separación vertical mínima 100 pt (66,7 u):
+
+| Columnas | Ancho sin foco (pt) | Ancho (unidades HOME) |
+|---|---|---|
+| 2 | 860 | 573,3 |
+| 3 | 560 | 373,3 |
+| 4 | 410 | 273,3 |
+| 5 | 320 | 213,3 |
+| 6 | 260 | 173,3 |
+| 7 | 217 | 144,7 |
+| 8 | 184 | 122,7 |
+| 9 | 160 | 106,7 |
+
+- `[A]` (`layout`, tvOS) Filas con título: dejar espacio entre el borde inferior de la fila anterior sin foco y el centro del título, y entre el título y la fila. Espaciado constante. «Make partially hidden content look symmetrical».
+- `[A]` (`layout`) Extender el fondo a pantalla completa por debajo de barras y paneles. Si un panel tapa parte de la imagen, el «background extension effect» la voltea y difumina bajo el panel.
+- `[A]` (`accessibility`) Tamaño de control en tvOS: 66×66 pt por defecto, 56×56 pt mínimo (44 y 37,3 u). Guía general, no específica de tvOS: unos 12 pt de relleno alrededor de elementos con bisel y 24 pt sin bisel.
+- `[A]` (`tab-bars`, tvOS) La barra de pestañas mide 68 pt de alto y su borde superior está a 46 pt del borde de la pantalla (45,3 y 30,7 u); «you can’t change either of these values». Es translúcida y solo la pestaña seleccionada es opaca. Si sobran elementos, se desvanece el borde derecho. Atrás (Menu) siempre devuelve el foco a la barra.
+- `[A]` (`scroll-views`, tvOS) No hay indicadores de desplazamiento: «the system automatically scrolls the interface to keep focused items visible».
+- `[A]` (`split-views`, tvOS) Por defecto un tercio para el panel principal y dos tercios para el secundario; un único título encima.
+- `[A]` (guía de usuario, «Change appearance settings») Con el tamaño de elementos en «Large», «the top row of the Home Screen shows five icons instead of six». La fila superior normal muestra seis.
+- `[A]` (`swiftui/creating-a-tvos-media-catalog-app-in-swiftui`) En búsqueda, «several rows of three to five items per row». Las estanterías desactivan el recorte para que el elemento enfocado pueda crecer.
+- Apple no publica este valor: tamaño en pantalla de los iconos del Home, altura y posición de la fila superior, separación entre filas del Home.
+
+### Materiales y Liquid Glass
+
+- `[A]` (`materials`) Liquid Glass forma «a distinct functional layer for controls and navigation elements». «Don’t use Liquid Glass in the content layer». «Use Liquid Glass effects sparingly».
+- `[A]` (`materials`) Dos variantes. **Regular** difumina y ajusta la luminosidad del fondo; es para texto abundante (alertas, barras laterales). **Clear** es muy translúcida y solo va sobre fondos ricos (fotos, vídeo).
+- `[A]` (`materials`) Bajo vidrio *clear* sobre contenido claro: «a dark dimming layer of 35% opacity». Sobre contenido oscuro no hace falta.
+- `[A]` (`materials`, tvOS) «Liquid Glass appears throughout navigation elements and system experiences such as Top Shelf and Control Center. Certain interface elements, like image views and buttons, adopt Liquid Glass when they gain focus».
+- `[A]` (`materials`, tvOS) Materiales estándar para la capa de contenido: `ultraThin` para vistas a pantalla completa con esquema claro; `thin` para superposiciones parciales con esquema claro; `regular` para superposiciones parciales; `thick` para superposiciones parciales con esquema oscuro.
+- `[A]` (`adopting-liquid-glass`) «Apple TV 4K (2nd generation) and newer models support Liquid Glass effects. On older devices, your app maintains its current appearance».
+- `[A]` (`color`, Liquid Glass color) El vidrio no tiene color propio. Los elementos pequeños alternan entre claro y oscuro según el fondo; los grandes son más opacos. Color solo para acciones principales o indicadores de estado, y aplicado al fondo del control, no al texto. No colorear el fondo de varios controles.
+- `[V]` (WWDC25 219) El vidrio se define por la lente: curva y concentra la luz en vez de dispersarla. Aparece y desaparece «by gradually modulating the light bending and lensing», no con un fundido. Al interactuar se flexiona y se ilumina desde dentro. Al crecer (un menú) se comporta como un material más grueso: sombra más profunda, más refracción.
+- `[V]` (WWDC25 219) La sombra del vidrio es más opaca sobre texto y más tenue sobre fondo claro liso. «Always avoid glass on glass»; sobre vidrio se usan rellenos, transparencia y vitalidad. *Regular* y *Clear* «should never be mixed».
+- `[V]` (WWDC25 219) *Clear* solo si se cumplen tres condiciones: está sobre contenido rico en imagen, ese contenido no sufre con una capa de atenuación, y lo que va encima es grueso y brillante.
+- `[V]` (WWDC25 219) Los elementos grandes (menús, barras laterales) no alternan entre claro y oscuro. En reposo (al abrir) evitar que el contenido se cruce con el vidrio.
+- `[V]` (WWDC25 219) Reducir transparencia hace el vidrio «frostier»; Aumentar contraste lo vuelve «predominantly black or white» con borde contrastado; Reducir movimiento baja la intensidad y desactiva lo elástico.
+- `[V]` (WWDC25 356) Tres formas: radio fijo, cápsula (radio = mitad de la altura) y concéntrica (radio del padre menos el relleno). Un modal que interrumpe lleva capa de atenuación; una tarea paralela no. Las hojas de acciones nacen del control que las abre.
+- `[A]` (newsroom, junio de 2025) En tvOS 26 el vidrio «reflects and refracts its surroundings using real-time rendering» y mantiene el vídeo a la vista al usar el Centro de control.
+- `[A]` (newsroom, septiembre de 2026) «a new slider in Settings gives users the option to personalize Liquid Glass, adjusting it anywhere from ultraclear to fully tinted». La nota lo presenta como cambio general de diseño; no dice de forma expresa que esté en tvOS 27.
+- `[A]` (`swiftui/creating-a-tvos-media-catalog-app-in-swiftui`) El Home de tvOS «blurs the most recently displayed top-shelf image and uses it as the background». Patrón por encima y por debajo del pliegue: arriba la imagen se ve nítida con un degradado de material; abajo «the entire image blurs».
+- Apple no publica este valor: radio de desenfoque, índice de refracción, anchura de la lente, opacidad de tintes, radios de esquina.
+
+### Movimiento
+
+- `[A]` (`motion`) Sin consideraciones específicas de tvOS y sin cifras. Reglas: movimiento con propósito; opcional; breve y preciso; evitar animar interacciones frecuentes en elementos propios; «Let people cancel motion»; coherencia espacial (lo que entra por arriba sale por arriba).
+- `[A]` (`motion`) En juegos, 30 a 60 fps. Es la única cifra de la página.
+- `[A]` (`designing-for-tvos`) «subtle and fluid animations».
+- `[A]` (`accessibility`) Con Reducir movimiento: tensar los muelles para quitar rebote, no animar cambios de profundidad, sustituir las transiciones en x, y, z por fundidos, no animar entradas y salidas de desenfoque.
+- `[V]` (WWDC18 803) Empezar con amortiguación del 100 % (sin rebote). El rebote se reserva para gestos con inercia; ejemplo citado: 80 % de amortiguación al cerrar con un deslizamiento. Las animaciones deben poder interrumpirse y redirigirse.
+- `[V]` (WWDC23 10158) Los muelles se definen con duración y rebote. Rebote 0: suave; 15 %: algo más vivo; 30 %: rebote ya visible. No esperar a la duración de asentamiento para cambios visibles.
+- `[V]` (WWDC17 224, espejo) En el foco, animaciones demasiado rápidas resultan bruscas y demasiado lentas estorban. Las animaciones propias deben derivarse de la duración que da el sistema (por ejemplo, la mitad).
+- `[V]` (WWDC19 211) Demasiadas animaciones, iconos y estilos de texto compiten por la atención; la interfaz de TV debe dejar a la persona «focused and relaxed».
+- Apple no publica este valor: duración y curva de la animación de foco, de apertura de apps, del Centro de control y del desplazamiento del Home.
+
+### Tipografía
+
+- `[A]` (`typography`, tvOS) «SF Pro is the system font in tvOS, and apps can also use NY».
+- `[A]` (`typography`, `accessibility`) Tamaño por defecto 29 pt y mínimo 23 pt (19,3 y 15,3 u). Evitar pesos Ultralight, Thin y Light.
+- `[A]` (`typography`) Estilos de texto de tvOS:
+
+| Estilo | Peso | Tamaño (pt) | Interlínea (pt) | Peso enfatizado | Tamaño (u HOME) |
+|---|---|---|---|---|---|
+| Title 1 | Medium | 76 | 96 | Bold | 50,7 |
+| Title 2 | Medium | 57 | 66 | Bold | 38 |
+| Title 3 | Medium | 48 | 56 | Bold | 32 |
+| Headline | Medium | 38 | 46 | Bold | 25,3 |
+| Subtitle 1 | Regular | 38 | 46 | Medium | 25,3 |
+| Callout | Medium | 31 | 38 | Bold | 20,7 |
+| Body | Medium | 29 | 36 | Bold | 19,3 |
+| Caption 1 | Medium | 25 | 32 | Bold | 16,7 |
+| Caption 2 | Medium | 23 | 30 | Bold | 15,3 |
+
+- `[A]` (`typography`) Tracking de tvOS en milésimas de em, para los tamaños de la tabla: 23 pt −4; 25 pt +6; 29 pt +14; 31 pt +13; 38 pt +10; 48 pt +8; 57 pt entre +6 y +5 (la tabla da 56 y 58); 76 pt +1; de 80 pt en adelante 0.
+- `[V]` (WWDC26 221) tvOS 27 trae tamaño de texto del sistema, de «Large» hasta «Accessibility XXXL» (Ajustes > Accesibilidad > Pantalla > Tamaño del texto). Reglas: estilos semánticos en vez de tamaños fijos; anchos flexibles; con texto grande, pasar de 6 a 4 columnas y de disposición horizontal a vertical en tarjetas; considerar una marquesina para títulos largos.
+- `[V]` (WWDC25 356) En el nuevo sistema la tipografía es más gruesa y alineada a la izquierda en alertas y bienvenida.
+- `[I]` SF Pro tiene licencia de Apple para sus plataformas; HOME no puede distribuirla. Hay que elegir otra sans y ajustar tamaño, peso y tracking a la tabla.
+
+### Color
+
+- `[A]` (`color`, tvOS) «Consider choosing a limited color palette that coordinates with your app logo». No usar solo color para indicar foco.
+- `[A]` (`color`) Probar en varias marcas de televisores HD y 4K y con distintos ajustes de imagen. No depender solo del color para comunicar estado.
+- `[A]` (`dark-mode`) tvOS tiene apariencia clara, oscura y automática; no ofrecer un ajuste de apariencia propio. Se admite una interfaz siempre oscura en apps de medios inmersivos.
+- `[A]` (`accessibility`) Contraste mínimo 4,5:1 para texto de hasta 17 pt; 3:1 para 18 pt o más, o texto en negrita. `[A]` (`dark-mode`) Con colores propios, aspirar a 7:1.
+- `[A]` (`playing-video`, tvOS) Algunos televisores retienen imagen: preferir gráficos translúcidos en SDR a contenido brillante y opaco, y superposiciones breves.
+
+### Iconos de app e imágenes por capas
+
+- `[A]` (`app-icons`) Icono de tvOS: lienzo de 800×480 px (proporción 5:3), rectángulo apaisado con esquinas redondeadas por el sistema, de 2 a 5 capas, estilo «Layered (Parallax)», sin variantes de apariencia. sRGB o Display P3.
+- `[A]` (`app-icons`) Al enfocar, el icono «elevates to the foreground in response to someone’s finger movement on their remote, and gently sways while the surface illuminates».
+- `[A]` (`app-icons`) Capas sin enmascarar; el sistema aplica las esquinas. No incluir brillos, sombras entre capas, biseles ni desenfoques propios. El texto, en la capa superior. Zona segura: el sistema recorta más las capas delanteras que el fondo.
+- `[A]` (`images`, tvOS) «Layered images are at the heart of the Apple TV user experience». De 2 a 5 capas; fondo opaco obligatorio; primer plano para lo prominente y el texto; capas medias para contenido secundario y sombras. Obligatorias para el icono de app; opcionales pero «strongly encouraged» para el resto.
+- `[A]` (`images`) tvOS usa escalas @1x y @2x.
+- `[A]` (`lists-and-tables`, tvOS) Una fila enfocada se resalta, crece un poco y puede redondear sus esquinas; no añadir máscaras propias.
+- `[A]` (newsroom, septiembre de 2026) En la versión 27 los iconos son «sharper and more defined».
+- Apple no publica este valor: radio de esquina del icono, desplazamiento de cada capa, tamaño del icono en el Home.
+
+### Top Shelf
+
+- `[A]` (`top-shelf`) Zona del Home que muestra contenido de la app enfocada en el Dock (la fila superior). Al seleccionar una app en el Dock empiezan las previsualizaciones a pantalla completa «and soon the Dock slides away».
+- `[A]` (`top-shelf`) Contenido nuevo y personalizado; sin anuncios ni precios; una imagen estática no debe parecer interactiva.
+- `[A]` (`top-shelf`) Imagen estática de reserva: 2320×720 pt (1546,7×480 u). tvOS «flips and blurs the image» para llenar 1920 de ancho en 16:9.
+- `[A]` (`top-shelf`) Disposiciones dinámicas: carrusel con acciones (título, subtítulo, botón principal y «More Info»), carrusel con detalles (añade resumen, reparto y metadatos; el título va arriba), fila de contenido por secciones y banner insertado con desplazamiento.
+- `[A]` (`top-shelf`) Tamaños de la fila por secciones:
+
+| Forma | Real (pt) | Enfocado / zona segura (pt) | Sin foco (pt) | Sin foco (u HOME) |
+|---|---|---|---|---|
+| Cartel 2:3 | 404×608 | 380×570 | 333×570 | 222×380 |
+| Cuadrado 1:1 | 608×608 | 570×570 | 500×500 | 333,3×333,3 |
+| 16:9 | 908×512 | 852×479 | 782×440 | 521,3×293,3 |
+| Banner insertado | 1940×692 | 1740×620 | 1740×560 | 1160×373,3 |
+
+- `[I]` El «333×570» del cartel sin foco parece una errata de Apple: 333×500 conservaría la proporción 2:3.
+- `[A]` (`top-shelf`) En una fila con formas mezcladas todo se escala a la altura del más alto (un 16:9 pasa a 500 px de alto). Cargar imágenes suficientes para cubrir el ancho y al menos una etiqueta.
+- `[A]` (`top-shelf`) Banner insertado: de 3 a 8 imágenes, avanza solo con temporizador hasta que una recibe foco, vuelve al principio al acabar; el texto debe ir dentro de la imagen.
+- `[V]` (WWDC19 211) Al enfocar la app se muestra un cartel «for five seconds» y luego entra el tráiler, sin forzar el sonido. Deslizar hacia arriba pasa a pantalla completa y «the dock flies away». Los metadatos aparecen a demanda. Puntos de paginación para situarse. Entre 5 y 10 elementos. Imágenes del carrusel a 1920×1080 pt, con cuidado de que el arte no quede bajo los controles ni bajo la rejilla de apps.
+- `[A]` (guía de usuario, «Navigate Apple TV 4K») Solo ciertas apps de la fila superior reproducen previsualización de fondo al resaltarlas.
+
+### Menús y menús contextuales
+
+- `[A]` (`context-menus`, `menus`) «No additional considerations for tvOS»: vale la guía general.
+- `[A]` (`context-menus`) Solo los comandos más probables; pocos elementos; presentes de forma coherente en toda la app; cada comando también disponible en la interfaz principal. «Hide unavailable menu items, don’t dim them». Submenús de un solo nivel. Como mucho unos tres grupos con separadores. Casi nunca con título.
+- `[A]` (`context-menus`) Elementos destructivos al final y marcados como tales. Apple lo enuncia para iOS, iPadOS y visionOS; tvOS no se nombra.
+- `[A]` (`menus`) Etiquetas con verbo, sin artículos, mayúsculas de título en inglés, puntos suspensivos si falta información. Iconos para todo un grupo o para ninguno. Submenú de más de unos cinco elementos: mejor otro menú. Marca de verificación para atributos activos.
+- `[A]` (guía de usuario, «Navigate» y «Rearrange apps») Pulsación larga del centro del clickpad sobre un elemento abre un menú emergente. En una app del Home, el menú lleva a editar el Home, a «Move to > New Folder», a «Move to > [carpeta]» y a «Move to > Home Screen». Se arrastra con el clickpad y se confirma pulsando el centro.
+- `[A]` (guía de usuario, «Rearrange apps») Carpetas: se crean al mover una app a «New Folder», se renombran desde el título, y desaparecen al sacar la última app. La fila superior es para favoritos.
+- `[V]` (WWDC25 219) Al mostrar un menú, la burbuja «simply pops open» desde el botón, para dejar clara la relación con su origen.
+
+### Centro de control y otras experiencias del sistema
+
+El HIG solo dice que el Centro de control usa Liquid Glass (`materials`). Lo demás sale de la guía de usuario de Apple TV 4K.
+
+- `[A]` («Navigate Control Center») Se abre manteniendo pulsado el botón TV. Abre en la pestaña de ajustes generales; izquierda y derecha cambian de pestaña; Atrás o TV lo cierran.
+- `[A]` («Tab icons in Control Center») Pestañas: perfiles, ajustes generales, Apple Home (cámaras y escenas), Cámara de continuidad, llamada de FaceTime (vídeo o audio), reproducción actual y auriculares. Varias solo aparecen cuando su función está activa.
+- `[A]` («Adjust general settings in Control Center») La pestaña general da apagado, Wi-Fi o Ethernet, No molestar, salida de audio, temporizador de reposo, mando de juego, accesibilidad, controles parentales y Buscar.
+- `[A]` («Status icons in Control Center») Los indicadores de estado van «in the upper-right corner of the Home Screen when Control Center isn’t active»: perfil actual, cámara o micrófono, restricciones, temporizador de reposo, batería baja del mando, FaceTime, audio en reproducción, auriculares Bluetooth, mando de juego, VPN y sin conexión.
+- `[A]` («Set notification preferences») Las notificaciones aparecen con un distintivo de icono de app en la esquina superior derecha del Home.
+- `[A]` («Switch between apps») Doble pulsación del botón TV: las apps abiertas aparecen como ventanas en fila; Atrás sale sin cambiar.
+- `[A]` («Activate or change the screen saver») Salvapantallas tras un tiempo de inactividad configurable, o a mano: en el Home, ir al icono más a la izquierda de la fila superior y pulsar Atrás. Tipos: Aerials, recuerdos y pases de diapositivas, retratos con reloj y Snoopy. Con el salvapantallas activo, derecha pasa al siguiente y el centro lo cierra.
+- `[A]` («Switch the current profile», newsroom de junio de 2025) Opción de mostrar la pantalla de perfiles al despertar el Apple TV.
+- `[A]` («Change appearance settings») Apariencia clara, oscura o automática, y tamaño de elementos Default o Large.
+- Apple no publica este valor: tamaño, columnas, radios y animación de los mosaicos del Centro de control.
+
+### Mando
+
+- `[A]` (`remotes`) Gestos estándar para acciones estándar. El foco se mueve siempre en la dirección del gesto.
+- `[A]` (`remotes`) Tabla de botones: superficie táctil (deslizar) navega y cambia el foco; superficie (pulsar) activa; Atrás vuelve a la pantalla anterior o sale al Home; Reproducir/Pausa controla la reproducción.
+- `[A]` (`remotes`) Atrás abre el padre de la pantalla actual, que no siempre es la anterior; en el nivel superior de una app el padre es el Home. Mantener Atrás lleva al Home desde cualquier sitio.
+- `[A]` (`remotes`) Distinguir pulsar (intencionado) de tocar (puede ser accidental). Deslizar tiene inercia: empieza rápido y frena según la fuerza.
+- `[A]` (guía de usuario, «Navigate») Se navega pulsando arriba, abajo, izquierda o derecha en el anillo del clickpad, o deslizando. Mantener una dirección del anillo desplaza rápido. «A highlighted app or item expands slightly».
+- `[A]` (guía de usuario, «Adjust remote settings») El clickpad admite «Click Only», que desactiva el seguimiento táctil. El botón TV puede abrir la app Apple TV o el Home.
+- `[A]` (`remotes`) Mandos compatibles: botones de guía y de página arriba y abajo para la guía de programación.
+- `[V]` (WWDC16 210, espejo) Seleccionar sobre un cartel abre el detalle; Reproducir/Pausa sobre el mismo cartel salta directo a la reproducción.
+
+### Teclado y búsqueda
+
+- `[A]` (`virtual-keyboards`, tvOS) Con el Siri Remote el teclado es lineal. «A grid keyboard screen appears when people use devices other than the Siri Remote».
+- `[A]` (`text-fields`, `managing-accounts`) Minimizar la entrada de texto; preferir botones; para datos largos, usar otro dispositivo. Para correo, el teclado de correo con direcciones recientes.
+- `[A]` (`search-fields`, tvOS) La pantalla de búsqueda es un teclado con los resultados debajo. Dar sugerencias populares, contextuales y búsquedas recientes.
+- `[A]` (`searching`, `search-fields`) En apps con pestañas como Apple TV, la búsqueda es una pestaña propia, con categorías visibles antes de escribir.
+- `[A]` (`digit-entry-views`) Entrada de dígitos a pantalla completa con teclado numérico, título e indicación; campo seguro (asteriscos) para datos sensibles.
+- `[A]` (`segmented-controls`, tvOS) Los segmentos se seleccionan al recibir foco, no al pulsar; no poner otros elementos enfocables cerca.
+
+### Alertas y hojas
+
+- `[A]` (`alerts`) Título, texto informativo opcional y hasta tres botones. En tvOS no admiten campo de texto. Atrás (Menu) cancela.
+- `[A]` (`alerts`) Usarlas poco. No para informar sin acción. No para acciones destructivas comunes y reversibles. No al arrancar.
+- `[A]` (`alerts`) Títulos de botón de una o dos palabras con verbo; «Cancel» siempre con ese nombre; el botón más probable arriba en una pila; estilo destructivo solo para lo que la persona no eligió de forma deliberada; Cancel nunca como botón por defecto.
+- `[A]` (`sheets`) En tvOS una hoja es siempre modal. `[A]` (`modality`) En tvOS se espera un botón para cerrar dentro de la vista.
+- `[A]` (`popovers`, `boxes`) No existen en tvOS. `[A]` (`action-sheets`) Disponibles, sin consideraciones propias.
+- `[A]` (`page-controls`, tvOS) Solo en colecciones de páginas a pantalla completa.
+
+### Carga y arranque
+
+- `[A]` (`launching`) «Launch instantly». La pantalla de arranque debe ser casi idéntica a la primera pantalla, sin texto ni marca; en tvOS es estática. Restaurar el estado anterior, incluida la posición de desplazamiento.
+- `[A]` (`loading`) Mostrar algo cuanto antes (marcadores de posición) y sustituirlo al llegar el contenido.
+- `[A]` (`progress-indicators`) Preferir progreso determinado; mantener el indicador en movimiento; no pasar de circular a barra; ubicación constante.
+- `[A]` (`playing-video`) Al pasar de la app TV a otra app la pantalla funde a negro y no se muestra la pantalla de arranque.
+- `[A]` (`playing-video`, tvOS) Para superposiciones interactivas sobre vídeo, esperar al menos 0,5 s antes de pausar y mostrarlas.
+- Apple no publica este valor: forma y duración de la transición de apertura de una app desde el Home.
+
+### Sonido
+
+- `[A]` (`playing-audio`, tvOS) «the system plays audio only when people initiate it». tvOS no acompaña con sonido las alertas ni las notificaciones.
+- `[V]` (WWDC17 224, espejo) «users expect a sound to be played when focus movement occurs». UIKit modifica cada sonido de foco: movimientos rápidos suenan más bajo y lentos más alto; el sonido se panea a izquierda o derecha según la posición del elemento en pantalla; los elementos grandes suenan más graves y los pequeños más agudos.
+- `[V]` (WWDC17 224, espejo) Existe un ajuste del sistema para apagar los sonidos de navegación; una app no debe sonar si la persona los apagó.
+- `[V]` (WWDC17 224, espejo) VoiceOver emite un sonido cuando se intenta mover el foco hacia donde no se puede.
+- `[V]` (WWDC17 803) Los sonidos de transición de Apple TV buscan sensación de profundidad y de movimiento, con dos sonidos distintos para avanzar y retroceder. Un buen sonido de interfaz se usa poco y a volumen muy inferior al de una notificación.
+- `[V]` (WWDC19 211) Las previsualizaciones de Top Shelf no fuerzan el sonido.
+
+### Accesibilidad
+
+- `[A]` (`accessibility`) Texto ampliable al menos un 200 %. Contraste y tamaños de control: véanse «Color» y «Layout».
+- `[A]` (`accessibility`) Evitar elementos que se cierran solos por tiempo. No autorreproducir audio o vídeo sin controles. Respetar Reducir movimiento y la atenuación de luces intermitentes.
+- `[A]` (guía de usuario) Ajustes de tvOS: texto en negrita, tamaño de texto, tamaño de elementos, diferenciar sin color, filtros de color, sensibilidad a la luz, reducir punto blanco, atenuar luces intermitentes, Hover Text, VoiceOver y Switch Control.
+- `[A]` (`right-to-left`) Sin consideraciones propias de tvOS: invertir la disposición en idiomas de derecha a izquierda.
+- `[A]` (`designing-for-tvos`) La gente está a 8 pies o más (unos 2,4 m) de la pantalla; legibilidad «from across the room».
+
+## Diferencias entre HOME y la guía
+
+Viabilidad en la TCL 55Q5K (GPU PowerVR BXE-4-32, mando con cruceta, interfaz a 1080p). Lo que se dice de Android es `[I]` y debe comprobarse en el firmware antes de implementarlo.
+
+| Aspecto | Qué especifica Apple | Qué hace HOME hoy | Diferencia | Viabilidad |
+|---|---|---|---|---|
+| Rejilla de 5 columnas | 320 pt + 40 pt, margen 80 pt (213,3 + 26,7 y 53,3 u) | 212 + 28, margen 54 | Ninguna apreciable | Hecho |
+| Separación vertical de filas | Mínimo 100 pt (66,7 u) entre filas sin foco, más aire si hay título | No comprobado en este estudio | Verificar | Viable |
+| Zona segura vertical | 60 pt (40 u) arriba y abajo | No comprobado; la cápsula de estado y el plato bajo deben respetarla | Verificar | Viable |
+| Columnas del Home | Seis iconos en la fila superior; cinco con tamaño Large | Cinco | HOME equivale al modo Large | Viable (173,3 u por icono con 6) |
+| Proporción del icono | 5:3 (800×480 px) | 16:9 (banner de Android TV) | Los banners de Android vienen en 16:9 | Viable con coste: recortar a 5:3 corta arte y logotipos |
+| Escala de foco | Sin cifra; 1,09 a 1,14 deducible `[I]` | 1,12 | Dentro del rango | Hecho |
+| Duración y curva de foco | Sin cifra; enfocar más rápido que desenfocar; más rápido si el foco corre | 260 ms fijos, misma curva | Falta la asimetría y la aceleración con repetición de tecla | Viable |
+| Rebote al enfocar | Sin cifra para tvOS; WWDC18: rebote solo si el gesto tiene inercia | Pequeño rebote | Una tecla de cruceta no tiene inercia `[I]` | Viable (probar sin rebote) |
+| Brillo y paralaje | Brillo especular e inclinación que siguen al dedo; capas que se separan | Banda de luz una vez e inclinación breve opuesta al sentido de avance | No hay seguimiento continuo ni capas; en tvOS la inclinación sigue al gesto | Seguimiento: no viable (mando sin superficie táctil). Capas: no viable (los banners de Android son planos). El sustituto actual es razonable |
+| Nombre de la app | Título oculto hasta el foco; se aparta al crecer la imagen | Nombre solo bajo el banner enfocado | Ninguna | Hecho |
+| Estado de inactividad | Lo no enfocado se atenúa y lo enfocado se expande | No existe | Falta | Viable; la atenuación debe ir en el color por vértice para no añadir pasadas |
+| Estado de pulsación | Vuelve al tamaño sin foco, respuesta inmediata, aspecto hundido | Lanza la app con ampliación desde el banner | Falta la respuesta al pulsar | Viable |
+| Estado no disponible | Sin sombra, translúcido, bajo contraste, no enfocable | No comprobado | Verificar | Viable |
+| Foco en el Centro de control | Blanco opaco con texto negro, más grande y con sombra más lejana | Mosaico blanco con contenido oscuro | Coincide en color; verificar escala y sombra | Viable |
+| Vidrio | Refracción y desenfoque en tiempo real; lente; brillo especular; se materializa modulando la lente | Copia predifuminada, lente y brillo en el borde, sin desenfoque en tiempo real | Estático; no refracta contenido que se mueve | Tiempo real: no viable (GPU débil). Apple también lo apaga en equipos antiguos |
+| Atenuación bajo vidrio claro | Capa oscura del 35 % si el fondo es claro | «Atenuación ligera» en el Centro de control | Verificar el valor con los tres fondos | Viable |
+| Vidrio sobre vidrio | Evitarlo | Menú de vidrio oscuro sobre el plato de favoritos | Posible caso `[I]` | Viable: menú más opaco, sin lente |
+| Accesibilidad del vidrio | Reducir transparencia, Aumentar contraste, Reducir movimiento | No hay ajustes | Falta | Viable: Android expone la escala de animación y el texto de alto contraste |
+| Regulador de vidrio | De ultraclaro a tintado (versión 27) | Tinte fijo | Falta | Viable: es un parámetro del shader |
+| Fondo al desplazar | Bajo el pliegue la imagen entera se difumina | El fondo se oscurece | Oscurece en vez de difuminar | Viable con coste: fundir a la copia predifuminada es un cuadro completo, que el desplazamiento ya paga |
+| Fondo del Home | Última imagen de Top Shelf, difuminada | Wallpaper propio a pantalla completa | Decisión de HOME; no hay Top Shelf | No aplica |
+| Top Shelf | Carrusel a pantalla completa, fila por secciones o banner; reserva estática 2320×720 pt volteada y difuminada | No existe | Falta entera | Con coste o no viable: leer los canales de otras apps exige en Android un permiso reservado al sistema `[I]`. Una reserva estática sí es viable |
+| «Seguir viendo» | Fila por secciones para reanudar | No existe | Falta | Misma limitación de permisos `[I]` |
+| Menú contextual | Pulsación larga; pocos elementos; ocultar lo no disponible; nace del elemento | Pulsación larga; Mover, Quitar de Inicio, Info | Acorde; verificar que nace del banner y que se ocultan las acciones no aplicables | Viable |
+| Orden del menú | Destructivos al final (regla escrita para iOS) | Quitar va en medio | Menor | Viable |
+| Reordenar | Cualquier app, arrastrando; confirmar con el centro | Solo favoritos, con temblor | Falta en el resto | Viable con coste: el temblor repinta la fila y baja a unos 30 cuadros |
+| Carpetas | «Move to > New Folder»; se borran al vaciarse | No existen | Falta | Viable con coste (modelo de datos y vista nueva) |
+| Centro de control: apertura | Mantener pulsado el botón TV; Atrás o TV cierran | OK sobre la cápsula del reloj; tecla Home | Otro gesto | Con coste: depende de que el servicio de accesibilidad reciba la pulsación larga de Home `[I]` |
+| Centro de control: estructura | Pestañas; la general con apagado, red, No molestar, audio, temporizador, mando, accesibilidad, búsqueda | Una vista de mosaicos en 2 columnas | Sin pestañas; faltan temporizador, No molestar y apagado | Mosaicos: viable. Apagado y temporizador: sin API confirmada en esta tele |
+| Indicadores de estado | Esquina superior derecha: sin conexión, audio, auriculares, mando, temporizador, VPN | Solo reloj | Faltan iconos de estado | Viable (red, Bluetooth y audio son consultables) |
+| Cambio de apps | Doble pulsación de TV; ventanas en fila | No existe | Falta | No viable o con coste: las miniaturas de tareas recientes no están al alcance de un launcher normal `[I]` |
+| Salvapantallas | Tras inactividad; o Atrás en el primer icono de la fila superior | Mosaico «Modo ambiente» | Falta el atajo con Atrás | Viable |
+| Perfiles | Pestaña de perfiles; pantalla de perfiles al despertar | No existe | Falta | Fuera de alcance |
+| Tipografía | SF Pro; 23 a 76 pt; Medium por defecto | Otra sans; escala 16, 18, 20, 22, 28, 40 u (24 a 60 pt) | El mínimo cumple (24 ≥ 23 pt); los escalones y el peso no siguen la tabla | Viable; SF Pro no se puede distribuir `[I]` |
+| Texto grande | Tamaño de texto del sistema; menos columnas | No hay | Falta | Viable: leer la escala de fuente de Android |
+| Sonido de foco | Esperado; volumen según velocidad; paneo según posición; tono según tamaño; respeta el ajuste | Clic del sistema | Sin paneo ni variación | Viable |
+| Teclado y búsqueda | Teclado en rejilla para mandos que no son el Siri Remote; sugerencias; resultados debajo | No existe | Falta | Viable con coste |
+| Alertas | Solo para lo irreversible y poco común | No comprobado; quitar un favorito es reversible | No debe pedir confirmación | Viable |
+| Notificaciones | Distintivo arriba a la derecha | No existe | Falta | Con coste: exige acceso a notificaciones concedido por el usuario |
+| Arranque | Instantáneo; primera pantalla igual a la de arranque; restaurar estado | No comprobado | Verificar que se restauran el foco y la posición | Viable |
+| Apertura de app | Sin especificación pública | Ampliación desde el banner | Sin referencia | Hecho |
+| Barra de pestañas | 68 pt de alto a 46 pt del borde | Sin barra; cápsula de estado | El Home de tvOS tampoco tiene pestañas | No aplica; alinear la cápsula a 30,7 u del borde es opcional |
+| Idiomas de derecha a izquierda | Disposición invertida; foco inicial arriba a la derecha | No comprobado | Baja prioridad | Viable |
+
+## Qué hacer a continuación
+
+Ordenado por efecto visual o de comportamiento frente a esfuerzo.
+
+1. **Estado de inactividad.** Tras unos segundos sin teclas, atenuar lo no enfocado y ampliar un poco más el banner enfocado; cualquier tecla lo deshace. Regla: `images` («out-of-focus content dims and the focused element expands»). Apple no da tiempo ni cantidad: hay que elegirlos a ojo. Tamaño: pequeño.
+2. **Foco asimétrico y que siga el ritmo.** Enfocar más rápido que desenfocar, y acortar ambas cuando llegan teclas repetidas. Probar la entrada sin rebote. Regla: `UIFocusAnimationCoordinator` y WWDC18 803. Tamaño: pequeño.
+3. **Estado de pulsación.** Al pulsar OK, el banner vuelve al tamaño sin foco con aspecto hundido antes de la ampliación de apertura; lo mismo en los mosaicos del Centro de control. Regla: `focus-and-selection` (estado *highlighted*). Tamaño: pequeño.
+4. **Difuminar bajo el pliegue.** Al desplazar a las filas siguientes, fundir el fondo a la copia predifuminada además de oscurecerlo, y volver a nítido arriba. Regla: muestra «media catalog» («the entire image blurs») y `materials`. Medir cuadros antes de dejarlo. Tamaño: pequeño a mediano.
+5. **Accesibilidad de movimiento y vidrio.** Con las animaciones de Android apagadas: sin rebote, sin inclinación, sin banda de luz, fundidos en vez de desplazamientos. Añadir en ajustes de HOME «reducir transparencia» (plato y mosaicos más opacos) y «aumentar contraste» (borde contrastado). Regla: `accessibility` y WWDC25 219. Tamaño: mediano.
+6. **Sonido de foco propio.** Volumen menor cuando las teclas llegan seguidas, paneo estéreo según la columna, tono más grave en elementos grandes, y silencio si los sonidos del sistema están apagados. Regla: WWDC17 224 y WWDC17 803. Tamaño: mediano.
+7. **Menú contextual como en tvOS.** Que nazca del banner, que oculte las acciones que no aplican y que deje «Quitar de Inicio» al final; no pedir confirmación al quitar. Regla: `context-menus`, `alerts`, WWDC25 219. Tamaño: pequeño.
+8. **Escala tipográfica de tvOS.** Llevar los tamaños a 15,3, 16,7, 19,3, 20,7, 25,3, 32, 38 y 50,7 u con peso Medium y el tracking de la tabla; nombre de app en Caption 1 o Body. Regla: `typography`. Tamaño: pequeño.
+9. **Atrás en el primer favorito abre el modo ambiente.** Regla: guía de usuario, «Activate or change the screen saver». Tamaño: pequeño.
+10. **Reglas de vidrio.** Fijar la atenuación bajo los mosaicos en el 35 % cuando el fondo es claro, quitar la lente del menú cuando cae sobre el plato, y añadir un regulador de tinte en ajustes. Regla: `materials`, WWDC25 219, nota de prensa de septiembre de 2026. Tamaño: pequeño.
+11. **Indicadores de estado junto al reloj.** Sin conexión, Bluetooth con auriculares, audio en reproducción y mando de juego, a la izquierda de la hora. Regla: guía de usuario, «Status icons in Control Center». Tamaño: mediano.
+12. **Tamaño de elementos y texto grande.** Ajuste Predeterminado (6 columnas de 173,3 u) o Grande (las 5 actuales), y respetar la escala de fuente de Android. Regla: guía de usuario («five icons instead of six») y WWDC26 221. Tamaño: mediano.
+13. **Reordenación libre y carpetas.** Mover cualquier app con el patrón «arrastrar con la cruceta, confirmar con OK», y «Mover a > Carpeta nueva». Regla: guía de usuario, «Rearrange apps». Tamaño: grande.
+14. **Top Shelf mínimo.** Zona superior que cambia con el favorito enfocado; empezar por la reserva estática (banner de la app volteado y difuminado) y estudiar si el firmware deja leer canales de vista previa. Regla: `top-shelf`. Tamaño: grande.
+15. **Búsqueda.** Pantalla con teclado en rejilla, sugerencias y recientes, y resultados de apps debajo. Regla: `search-fields`, `virtual-keyboards`. Tamaño: grande.
+
+## Lo que no pude consultar
+
+- Ningún vídeo ni imagen. De las figuras del HIG solo leí el texto alternativo, así que no hay medidas tomadas de capturas.
+- Las plantillas de Apple Design Resources para tvOS (archivos de Sketch, Figma y Photoshop). Es donde estarían los tamaños reales de los iconos del Home, radios de esquina y sombras.
+- La transcripción de la Keynote de WWDC25, donde se presentó tvOS 26: la página no la incluye.
+- Las sesiones de tvOS de WWDC16 y WWDC17 en el sitio de Apple (retiradas). Las leí en un espejo de terceros y solo por palabras clave; no puedo garantizar que el espejo sea fiel.
+- Los Tech Talks de Apple TV de 2015 («Designing for Apple TV»): la URL redirige al índice.
+- Las páginas del HIG de compras dentro de la app y de autenticación de proveedor de TV: los slugs que probé dan 404.
+- Las sesiones enlazadas desde `focus-and-selection` (puntero de iPadOS y visionOS): no las leí por no tratar de tvOS.
+- Las secciones de iOS, iPadOS, macOS, visionOS y watchOS de las páginas del HIG, y el texto general de las páginas marcadas como «solo sección de tvOS» en la tabla de fuentes.
+- Varias transcripciones largas solo se leyeron por palabras clave (WWDC18 803, WWDC19 211, WWDC23 10158, WWDC17 803 y las dos Platforms State of the Union).
+- La página de la guía de usuario sobre instalar y borrar apps, y las de perfiles en detalle.
+- Una descripción oficial del Home de tvOS 26 o 27 con medidas. Apple no la publica; lo que este documento dice del Home viene de la guía de usuario y de una muestra de código.
+- El estado real del código de HOME: la columna «Qué hace HOME hoy» usa la descripción recibida y `design.md`; las celdas «No comprobado» están sin verificar. Nada de la columna de viabilidad se probó en la tele.
+
+
+---
+
+<!-- source: docs/llm-wiki/tcl-apis.md -->
+
+# APIs de TCL y Realtek en la 55Q5K
+
+Mapa de las APIs Java del fabricante que existen en esta tele, hecho solo con análisis estático (`dexdump` de los jar extraídos por `adb pull`, manifiestos con `aapt2`, `service list`, `dumpsys package`). Firmware analizado: `TCL/G10_4K_GB_NF_32BIT/G10:14/UTT2.250416.001/AU02:user/release-keys`, Android 14.
+
+**El mapa es estático; lo ejecutado está en «Comprobado en la tele».** Cada fila dice lo que hay en el bytecode, no que la llamada funcione. Aviso único que vale para todo el documento: aunque la clase cargue y el método no compruebe permisos, SELinux puede negar a `untrusted_app` el `find` del servicio binder que hay debajo, y eso solo se ve en la tele (`avc: denied` en logcat). La única ruta con prueba real es la que HOME ya usa: `TvBacklightManager` (véase `LumeBridge.tclBacklight` / `setTclBacklight`).
+
+## Comprobado en la tele (2026-11-15, HOME 0.9.5, uid de app normal)
+
+| Llamada | Resultado |
+| --- | --- |
+| `TvBacklightManager.getInstance().getBacklight()` | Funciona. Devuelve 0–100; coincide con «Brillo» del menú de imagen. |
+| `setBacklight(EN_APPLY_CURRENT, n, EN_TCL_ACT_EXEC_SAVE)` | Funciona: `TclDisplayServer` lo ejecuta y la lectura siguiente devuelve `n` (probado 100 → 85 → 100). Es lo que usa el deslizador de Brillo del Centro de control. |
+| `getLightSensorOnoff()` | Funciona; devuelve 0. |
+| `setLightSensorOnoff(1, EN_TCL_ACT_EXEC_SAVE)` | Devuelve `true`, pero el servidor registra `on_off = 0` y la lectura sigue en 0: en la 55Q5K el sensor no se activa. HOME abre entonces el panel de imagen. |
+| `Settings.System.SCREEN_BRIGHTNESS` | Se puede escribir con `WRITE_SETTINGS` y llega a la luz 0 del HAL de Android, pero **no cambia el panel**. Solo queda como respaldo para otras marcas. |
+
+SELinux no bloqueó el servicio `tcl_tv_display` para HOME. El modo de imagen actual se ve en el registro como `cur_pic_mode_name_type = 10`; la tabla de valores sigue sin conocerse, así que HOME no lo cambia.
+
+## Cómo usar esto desde HOME
+
+### Tres clases de librería
+
+| Nivel | Qué es | Librerías | Qué puede hacer una app normal |
+| --- | --- | --- | --- |
+| **A** | Shared library registrada (`pm list libraries`), fuera del BOOTCLASSPATH, sin sección `hiddenapi_class_data` en el dex | `com.tcl.tv.display`, `com.tcl.tvinput`, `com.tcl.hdmi`, `com.tcl.hbbtv`, `com.tcl.ginga.porting`, `com.tcl.gingad`, `com.tcl.tbrowser`, `tromlib`, `rtk-framework`, `tcl.factory.hal`, `tcl.factory.hal.ext` | `<uses-library android:required="false">` + reflexión normal |
+| **B** | Jar del BOOTCLASSPATH. Todos los miembros propios están marcados `blocked` en `hiddenapi_class_data` (comprobado decodificando la sección: `tcl-framework` 4304 miembros `blocked`, `tcl.os.TDeviceInfo` 46/46, `tcl.media.TAudioManager` 103/103, `android.media.TclAudioManager` 109/109) | `/apex/com.tcl.tcore/javalib/tcl-framework.jar`, clases TCL dentro de `/system/framework/framework.jar`, `/apex/com.tcl.motor/javalib/tcl-motor-framework.jar`, `/apex/com.tcl.hera/javalib/*.jar`, `/system_ext/framework/rtk-mediaplayer.jar`, `/system/framework/tcl.webkit.jar` | La clase se ve, pero con `targetSdk 36` la reflexión sobre miembros `blocked` falla (`NoSuchMethodException`) salvo que la política de API ocultas del dispositivo esté relajada. **La premisa "lo que está en BOOTCLASSPATH se llama por reflexión" no se sostiene aquí.** |
+| **C** | Jar solo de `system_server` (SYSTEMSERVERCLASSPATH) | `/apex/com.tcl.tcore/javalib/tcl-service.jar`, `/apex/com.tcl.apex.tvinput/javalib/com.tcl.hdmi-service.jar`, `/apex/com.tcl.motor/javalib/tcl-motor-service.jar`, `rtk-framework-window-service` (registrada como librería, pero su contenido es `com.android.server.wm.*`) | No se puede llamar. Aquí viven las comprobaciones de permisos de los servicios. |
+
+Puente entre A y B: `tromlib` (`/system_ext/framework/tromlib.jar`, registrada, sin flags) envuelve unas pocas clases de nivel B. En AOSP el código cargado desde `/system_ext/framework` cuenta como dominio de plataforma para las API ocultas, así que sus llamadas internas a clases `blocked` deberían pasar (comportamiento de AOSP, no verificado en esta tele). Es la única vía limpia hacia `TDeviceInfo` y `TclAudioManager`.
+
+`rtk-mediaplayer` y `tcl.webkit` tienen XML de librería, pero están en BOOTCLASSPATH con flags `blocked`: cuentan como nivel B. El XML de `rtk-mediaplayer` apunta a `/product/framework/rtk-mediaplayer.jar`, que no existe; el jar real está en `/system_ext/framework/`.
+
+### Patrón (ejemplo real: brillo del panel)
+
+Manifiesto, dentro de `<application>` (ya está para `com.tcl.tv.display`; cada librería nueva necesita su línea):
+
+```xml
+<uses-library android:name="com.tcl.tv.display" android:required="false" />
+```
+
+Llamada por reflexión, siempre en `try/catch (Throwable)` porque en otra marca la clase no existe:
+
+```java
+Class<?> manager = Class.forName("com.tcl.tv.pq.TvBacklightManager");
+Class apply = Class.forName("com.tcl.tv.pq.EnApplyType");
+Class act = Class.forName("com.tcl.tv.pq.EnTclActType");
+Object instance = manager.getMethod("getInstance").invoke(null);
+int now = (Integer) manager.getMethod("getBacklight").invoke(instance);
+Object ok = manager.getMethod("setBacklight", apply, int.class, act).invoke(instance,
+        Enum.valueOf(apply, "EN_APPLY_CURRENT"), 60, Enum.valueOf(act, "EN_TCL_ACT_EXEC_SAVE"));
+```
+
+Qué ocurre por dentro (leído en el bytecode):
+
+1. `TvBacklightManager.getInstance()` llama a `PqSDKManager.getInstance(null)`.
+2. `PqSDKManager` prueba `Class.forName("com.tcl.tvmanager.TTvPictureManager")`. Esa clase no está en ningún jar extraído, así que cae en la rama `tvsdk` (`com.tcl.tv.pq.tvsdk.TvSdkManagerImpl`).
+3. `tvsdk.TvBacklightManagerImpl.<init>` hace `Class.forName("android.os.ServiceManager").getMethod("getService", String).invoke(null, "tcl_tv_display")` y `ITvDisplayManagerService.Stub.asInterface(...)`.
+4. `setBacklight(EnApplyType,int,EnTclActType)` pasa los `ordinal()` de los enums a `ITvDisplayManagerService.setBacklight(int,int,int)`.
+
+Los managers no comprueban nada del llamador y tragan `RemoteException` (devuelven `-1` o `false`). El servicio `tcl_tv_display` es un binario nativo (`/system_ext/bin/tcl_tv_display_service`, `user root`, `seclabel u:r:tcl_display_service:s0`) que adb no deja leer: lo que comprueba por dentro no se conoce. Toda la sección "Imagen" depende de ese mismo servicio, así que lo que valga para el brillo es el mejor indicio para el resto.
+
+Enums compartidos (constantes en orden alfabético del volcado; el `ordinal()` real no se ha leído, usar siempre `Enum.valueOf`):
+
+- `com.tcl.tv.pq.EnApplyType`: `EN_APPLY_ALL_PICMODE`, `EN_APPLY_CURRENT`, `EN_APPLY_MAX`
+- `com.tcl.tv.pq.EnTclActType`: `EN_TCL_ACT_EXEC`, `EN_TCL_ACT_EXEC_SAVE`, `EN_TCL_ACT_SAVE`, `EN_TCL_ACT_MAX`
+- `com.tcl.tv.pq.EnPicModeFieldType`: `EN_PICTURE_MODE_FIELD_GLOBAL`, `_GLOBAL_OFF`, `_NORMAL`, `_SUB`, `_MAX`
+- `com.tcl.tv.pq.EnPqMemcType`: `EN_PQ_MEMC_OFF`, `_LOW`, `_MID`, `_HIGH`, `_24PFILM`, `_CUSTOME`, `_MAX`
+- `com.tcl.tv.pq.EnColorTmpType`: `EN_COLOR_TMP_COOL`, `EN_COLOR_TMP_STANDARD`, `EN_COLOR_TMPE_WARM` (sic), `EN_COLOR_TMP_PERSONAL`, `EN_COLOR_TMP_CUSTOM_1`, `EN_PQ_COLOR_TMP_STANDARD_TO_COOL1..4`, `EN_PQ_COLOR_TMP_STANDARD_TO_WARM1..4`, `EN_PQ_COLOR_TMP_NUM`
+- `com.tcl.tv.pq.EnResetFunctionType`: `EN_RESET_PICMODE`, `EN_RESET_ALL_DATA`, `EN_RESET_DISPLAY_SETTING`, `EN_RESET_MOTION_CLARITY`, `EN_RESET_COLOR_SPACE`, `EN_RESET_CUST_GAMMA`, `EN_RESET_CUST_WHITE_BALANCE` (cada uno con variante `_APPLY_ALL`), `EN_RESET_MAX`
+- `com.tcl.tv.pq.TvPqManager$EnInputSource`: `EN_TCL_NONE`, `EN_TCL_ATV`, `EN_TCL_DTV`, `EN_TCL_AV1`, `EN_TCL_AV2`, `EN_TCL_HDMI1..4`, `EN_TCL_DV`, `EN_TCL_DV2..4`, `EN_TCL_YPBPR`, `EN_TCL_YPBPR2..3`, `EN_TCL_VGA`, `EN_TCL_STORAGE`, `EN_TCL_STORAGE2`, `EN_TCL_OSD`, `EN_TCL_KTV`, `EN_TCL_MAX`
+- `com.tcl.tv.display.TvDisplayManager$EnActionControl`: `EN_ACT_EXEC`, `EN_ACT_EXEC_SAVE`, `EN_ACT_SAVE`, `EN_ACT_MAX`
+- `com.tcl.tv.display.TvDisplayManager$EnMuteType`: `EN_MUTE_NORMAL`, `EN_MUTE_AVOUT`, `EN_MUTE_STILL_IMG`, `EN_MUTE_TEST_PATTERN`, `EN_MUTE_AUTO_GAMMA`, `EN_MUTE_MAX`
+- `com.tcl.tv.display.TvDisplayManager$EnSignalInfoType`: `EN_SIGNAL_INFO_ALLM`, `EN_SIGNAL_INFO_DYNAMIC_RANGE`, `EN_SIGNAL_INFO_VRR`, `EN_SIGNAL_INFO_MAX`
+- `com.tcl.tv.display.TvDisplayManager$EnHdrType`: `EN_HDR_TYPE_SDR`, `_HDR10`, `_HDR10_PLUS`, `_HLG`, `_HLG18`, `_DOLBY`, `_PRIMIUM`, `_UNKNOW`
+
+Leyenda de las tablas: **Cargable** = nivel A, B o C de arriba. **Comprobaciones vistas** = lo que se leyó en el cuerpo del método y, cuando el servidor es Java, en su implementación; "ninguna" significa que no aparece ni cadena de permiso ni `getCallingUid`, no que el servicio acepte la llamada. *(inf.)* marca una descripción deducida solo del nombre.
+
+## Imagen
+
+Todo en `com.tcl.tv.display` (115 clases). Managers: `TvBacklightManager`, `TvPqManager` (132 métodos públicos), `TvPanelManager`, `TvDisplayManager`, `TvDDCManager`, `TvPqDebugManager`; todos con `static getInstance()` sin argumentos. En `TvPqManager` casi todos los métodos llevan un primer `int` cuyo significado no se ha podido leer (sin nombres de parámetros en el dex; *(inf.)* id de ventana o de fuente, véase `TvDisplayManager.getWindowID(int)`).
+
+| clase.método(firma) | Qué hace | Librería | Cargable | Comprobaciones vistas |
+| --- | --- | --- | --- | --- |
+| `TvBacklightManager.getBacklight() : int` | Brillo del panel. En uso por HOME | `com.tcl.tv.display` | A | Ninguna en la librería; servicio nativo `tcl_tv_display` no legible |
+| `TvBacklightManager.setBacklight(EnApplyType,int,EnTclActType) : boolean` | Fija el brillo del panel. En uso por HOME | ídem | A | ídem |
+| `TvBacklightManager.getLightSensorOnoff() : int` / `setLightSensorOnoff(int,EnTclActType) : boolean` | Sensor de luz ambiente *(inf.)* | ídem | A | ídem |
+| `TvBacklightManager.getDBCLevel() : int` / `setDBCLevel(EnApplyType,int,EnTclActType) : boolean` | Control dinámico de retroiluminación *(inf.)* | ídem | A | ídem |
+| `TvBacklightManager.getMixDimming() : int` / `setMixDimming(EnApplyType,int,EnTclActType) : boolean` | Atenuación mixta *(inf.)* | ídem | A | ídem |
+| `TvPqManager.getPictureMode() : int` | Modo de imagen actual; llama a `ITvDisplayManagerService.getPictureMode()` | ídem | A | ídem |
+| `TvPqManager.setPictureMode(int,int,EnPicModeFieldType,EnTclActType) : boolean` | Cambia el modo de imagen; llama a `setPictureMode(int,int,int,int)` | ídem | A | ídem |
+| `TvPqManager.setPictureMode(int,EnApplyType,int,EnPicModeFieldType,EnTclActType) : boolean` | Variante; llama a `setPictureModeByType(int,int,int,int,int)` | ídem | A | ídem |
+| `TvPqManager.getPictureType(int) : int` / `setPictureType(int,EnApplyType,int,EnTclActType) : boolean` | Tipo de imagen *(inf.)* | ídem | A | ídem |
+| `TvPqManager.getBrightness(int) : int` / `setBrightness(int,EnApplyType,int,EnTclActType) : boolean` | Brillo de vídeo (no el del panel) | ídem | A | ídem |
+| `getContrast(int)` / `setContrast(int,EnApplyType,int,EnTclActType)`; igual forma para `Saturation`, `Sharpness`, `Hue` | Ajustes básicos | ídem | A | ídem |
+| `TvPqManager.getColorTemperature(int) : int` / `setColorTemperature(int,EnApplyType,EnColorTmpType,EnTclActType) : boolean` | Temperatura de color | ídem | A | ídem |
+| `TvPqManager.getLowBlueRay(int) : int` / `setLowBlueRay(int,int,EnTclActType) : boolean` | Luz azul baja | ídem | A | ídem |
+| `TvPqManager.getMemcConfig(int) : int` / `setMemcConfig(int,EnApplyType,EnPqMemcType,EnTclActType) : boolean` | MEMC por nivel | ídem | A | ídem |
+| `getMemcBlur(int)` / `setMemcBlur(int,EnApplyType,int,EnTclActType)`; igual para `MemcJudder`, `MotionClarity`, `LedMotionClarity` | MEMC fino *(inf.)* | ídem | A | ídem |
+| `TvPqManager.getGameModeConfig(EnInputSource) : int` / `setGameModeConfig(EnInputSource,int,EnTclActType) : boolean` | Modo juego por entrada | ídem | A | ídem |
+| `TvPqManager.getGamePicutreModeType(int) : int` (sic) / `setGamePictureModeType(int,int,EnTclActType) : boolean` | Modo de imagen dentro de juego *(inf.)* | ídem | A | ídem |
+| `getALLMMode(int)` / `setALLMMode(int,int,EnTclActType)`; `getVRRMode(int)` / `setVRRMode(int,int,EnTclActType)`; `getVrrRefreshRate() : float`; `getLowlantency(int)` / `setLowlantency(int,EnApplyType,int,EnTclActType)` | ALLM, VRR, baja latencia | ídem | A | ídem |
+| `getDynamicToneMapping(int)` / `setDynamicToneMapping(int,EnApplyType,int,EnTclActType)`; `getHDRToneMappingAdjust(int)` / `set…`; `getSdr2Hdr(int)` / `setSdr2Hdr(…)`; `getVideoEOTFMode(int)` / `setVideoEOTFMode(int,EnApplyType,EnVideoEotfMode,EnTclActType)`; `getDolbyGameStatus(int)` | HDR | ídem | A | ídem |
+| `getDynamicContrast(int)`, `getNR(int)`, `getMpegNR(int)`, `getDeContour(int)`, `getBlackStretch(int)`, `getColorEnhance(int)`, `getDarkEnhance(int)`, `getAipqEnable(int)`, `getAisrEnable(int)`, `get24p(int)`, `getDLGMode(int)`, `getDDMMode(int)`, `getRgbSensor(int)`, `getGammaLevel()` y su `set…` (forma `(int,EnApplyType,int,EnTclActType)` salvo `DLG`/`DDM`: `(int,int,EnTclActType)` y `setGammaLevel(EnApplyType,int,EnTclActType)`) | Mejoras varias | ídem | A | ídem |
+| `TvPqManager.getTvVideoInfo(int) : TvVideoInfo` | Información de la señal de vídeo (Parcelable, campos sin nombre legible) | ídem | A | ídem |
+| `TvPqManager.getFunctionIsSupport(TvPqManager$EnFunctionSupportType) : boolean` | Capacidades del panel | ídem | A | ídem |
+| `TvPqManager.getDefaultData(int,int,TvPqFuncType) : int` | Valor por defecto de una función | ídem | A | ídem |
+| `TvPqManager.resetPQFunction(EnResetFunctionType) : boolean` | Restablece ajustes de imagen | ídem | A | ídem |
+| `TvPqManager.addCallback(TvPqCallback) : boolean` / `removeCallback(TvPqCallback)`; `TvPqCallback.onEvent(int,int,TvPqCallbackParameter) : boolean` | Avisos de cambio (`EN_UPDATE_PQ_PARAM_CHANGE`, `EN_UPDATE_PQ_PARAM_ERROR`) | ídem | A | ídem |
+| `TvPqManager.getOption(int,int,String) : String` / `setOption(int,int,String)` / `setOptionStream(int,int,int,byte[])` | Canal genérico sin documentar | ídem | A | ídem. No tocar a ciegas |
+| `TvPqManager.setBacklightConstant(boolean)`, `setMuteConstant(boolean)`, `setStrOnoff(boolean)`, `setCountry(String)`, `setHotLoad(int,int)`, `setFacPMode(int)`, `setFacWarmMode(int)`, `setGammaData(…)`, `set3DlutRGB(…)`, `reinitGamma()`, `setDolbyCfgPath(int,String)`, balances de blanco y curvas | Calibración y fábrica | ídem | A | ídem. **No para apps** |
+| `TvPanelManager.getLocalDimming() : int` / `setLocalDimming(EnApplyType,int,EnTclActType) : boolean`; `getMicroDimming()` / `setMicroDimming(…)`; `getPanelFrameRate() : int`; `getLocalDimmingRow()`, `getLocalDimmingCol()`, `getLocalDimmingData() : int[]`; `getViewAngle()` / `setViewAngle(int)` | Panel | ídem | A | ídem |
+| `TvDisplayManager.getAspectRatio(int) : EnAspectRatio` / `setAspectRatio(int,EnAspectRatio,EnActionControl) : boolean` | Relación de aspecto | ídem | A | ídem |
+| `TvDisplayManager.getTvInputVideoInfo(int) : TvInputVideoInfo`; `getSignalInfo(EnSignalInfoType) : int` | Señal de la entrada (ALLM, rango dinámico, VRR) | ídem | A | ídem |
+| `TvDisplayManager.getWindowMute(int,EnMuteType) : boolean` / `setWindowMute(int,EnMuteType,EnMuteLevel,boolean) : boolean` | Silencia (pone en negro) la ventana de vídeo *(inf.)*; no es apagar el panel | ídem | A | ídem |
+| `TvDisplayManager.setCallback(TvDisplayCB) : boolean` / `removeDisplayCallback(TvDisplayCB)`; `TvDisplayCB.notify(int,int,int,int,String) : boolean` | Eventos de pantalla (`TvDisplayCallbackEventType`: `EN_EVENT_PANEL_ON_OFF`, `EN_EVENT_DYNAMIC_RANGE_CHANGE`, `EN_EVENT_ALLM_CHANGE`, `EN_EVENT_VSYNC_CHANGE`, `EN_EVENT_FORMATE_CHANGE`, …) | ídem | A | ídem |
+| `TvDisplayManager.setDisplayWindow(int,WindowRect)`, `getWindowRect(int)`, `setOverScanValue(…)`, `setVgaParameter(…)`, `autoPcAdjust(…)`, `setWhiteBalancePattern(int,boolean,int,int,int)`, `getMethod(int,String) : Bundle` / `setMethod(int,String,Bundle)` | Geometría de la ventana de vídeo y patrones | ídem | A | ídem. No para un launcher |
+| `TvDDCManager.*` (`getHdrMode`, `setHdrMode(int)`, `getEotfPeak`, `importCalFile`, `exportCalFile`, …), `TvPqDebugManager.*` (`dumpThalParam(int)`, `setBypassStatus(int,int)`) | Calibración con sonda y depuración | ídem | A | ídem. **No para apps** |
+| `com.realtek.tv.PQ.getBacklight() : int` / `setBacklight(int) : int`; `getPictureMode()` / `setPictureMode(int)`; `getBrightness()` / `setBrightness(int)`; `getLowBlueLevel()` / `setLowBlueLevel(int)`; `enableGameMode(boolean)`; `enableBacklight(boolean)` (284 métodos en total) | Capa Realtek equivalente | `rtk-framework` | A | Va a `vendor.rtk.tv.IAidlRtkPQ` (HAL `vendor.rtk.tv.IAidlRtkTvService/default`). El cuerpo de `setBacklight` contiene `System.exit(int)` (rama de error *(inf.)*): **puede matar el proceso de HOME**. No usar |
+
+Los valores `int` de modo de imagen (estándar, cine, juego…) no son un enum en la librería: hay que leerlos con `getPictureMode()` en la tele.
+
+## Sonido
+
+No hay ninguna librería de nivel A con ajustes de sonido. Todo cuelga de `tcl.media.TAudioManager` (`tcl-framework`) → `android.media.TclAudioManager` (`framework.jar`), que obtiene su binder con `IAudioService.getTclInnerService()` sobre el servicio `audio`. Implementación: `AudioService$TclInnerAudioService` → `com.android.server.audio.TclAudioServiceEx` / `TclSoundEffect` / `TclSoundSetting` (`tcl-service.jar`).
+
+| clase.método(firma) | Qué hace | Librería | Cargable | Comprobaciones vistas |
+| --- | --- | --- | --- | --- |
+| `TAudioManager.getAudioOption(int) : int` | Lee una opción de `tcl.media.TAudioSystemOptionType`, por ejemplo `TCL_AUDIO_PARAM_TYPE_SOUNDMODE = 12289` (modo de sonido) | `tcl-framework` | B | `TclSoundEffect.getAudioOption`: `"android.permission.MODIFY_AUDIO_ROUTING"` con `checkCallingOrSelfPermission` (`signature\|privileged\|role`) |
+| `TAudioManager.setAudioOption(int,int) : void` | Escribe una opción. Modos: `TCL_AUDIO_SYSTEM_SOUND_MODE_STANARD=0` (sic), `MOVIE=1`, `MUSIC=2`, `NEWS=3`, `GAME=4`, `SPORTS=5`, `USER=6`, `SMART=7`, `LIVE=8`, `NIGHT=14`. Otras claves: `_BASS=12291`, `_DIALOG=12292`, `_TREBLE=12293`, `_NIGHTMODE=12294`, `_SURROUND=12290`, `_ONOFF=12288`, `TCL_SOUND_SCENE=12296`, `TCL_ATMOS_ENABLE=12295` | ídem | B | `TclAudioServiceEx.setAudioOption` hace `Binder.clearCallingIdentity()` **antes** de delegar en `TclSoundEffect.setAudioOption`, cuyo `checkCallingOrSelfPermission(MODIFY_AUDIO_ROUTING)` se evalúa entonces como `system_server`. Estáticamente la escritura queda sin comprobación efectiva y la lectura no. El helper `setAudioOption_enforcePermission` existe en el `Stub` pero no se invoca desde `TclInnerAudioService` |
+| `TAudioManager.getAudioBalance() : int` / `setAudioBalance(int) : int`; `setAudioBassLevel(double)`, `setAudioTrebleLevel(double)`; `getAudioEqualizerDb(int)` / `setAudioEqualizerDb(int,int)`; `getGraphicEqBands() : int[]`; `resetEffectSettings()` | Balance, graves, agudos, ecualizador | ídem | B | `MODIFY_AUDIO_ROUTING` en `TclSoundEffect` |
+| `TAudioManager.getSpdifMode() : int` / `setSpdifMode(int)`; `getSpdifDelay()` / `setSpdifDelay(int)` | Salida digital. `tcl.media.TSpdifType`: `TCL_OFF=0`, `TCL_PCM=1`, `TCL_DDP=2`, `TCL_AUTO=3`, `TCL_PASSTHROUGH=4`, `TCL_DD=5`, `TCL_MAT=6` | ídem | B | `MODIFY_AUDIO_ROUTING` en `TclSoundSetting` |
+| `TAudioManager.getTAudioStreamInfo() : TAudioStreamInfo`; `getTDtsStreamInfo()`; `getTAudioCapability(int)`; `isAudioFunctionSupport(int) : boolean`; `isExtSpeakerOn() : boolean`; `getDSPDriverVersion() : String` | Formato de audio en curso y capacidades | ídem | B | `MODIFY_AUDIO_ROUTING` en `TclSoundSetting` |
+| `TAudioManager.getStreamDeviceVolume(int,int) : int` / `setStreamDeviceVolume(int,int,int,int,Context) : void` | Volumen por dispositivo; el `set` acaba en `AudioService.setStreamVolume(int,int,int,String)` | ídem | B | Ninguna propia. Equivale a `AudioManager.setStreamVolume`, que HOME ya usa |
+| `TAudioManager.isVolumeAdjustmentDisabled() : boolean` / `setVolumeAdjustmentDisabled(boolean)` | Bloqueo del volumen | ídem | B | Lectura: ninguna. Escritura: `MODIFY_AUDIO_ROUTING` |
+| `TAudioManager.getTExternalDeviceInfo(int) : TExternalDeviceInfo`; `getExtDeviceConnectionState(int) : int` | Dispositivo de audio externo (barra, ARC) | ídem | B | `getTExternalDeviceInfo`: ninguna (lee `AudioSystem.getParameters`). `getExtDeviceConnectionState`: sin comprobación en `TclAudioServiceEx` |
+| `android.media.TclAudioManagerEx.getInstance()`; `isVolumeAdjustmentDisabled() : boolean`; `getTExternalDeviceInfo(int) : TExternalDeviceInfoEx` | Envoltorio de lo anterior | `tromlib` | A | Las del servidor de la fila de arriba (ninguna vista) |
+| `android.media.TclAudioManager.setDevMode(int)`; `static switchDevMode2Device(int) : int`; `static toSelectDeviceStr(int) : String` | Dispositivo de salida. Nombres vistos: `TCL_DEVICE_OUT_TYPE_AUTO`, `_SPEAKER`, `_BLUETOOTH_A2DP`, `_SPEAKER_AND_BLUETOOTH_A2DP`, `_WIRED_HEADPHONE`, `_SPEAKER_AND_WIRED_HEADPHONE`, `_HDMI_ARC`, `_LINE`, `_AVOUT`, `_USB`, `_WIFI`, `_SPEAKER_AND_WIFI` | `framework.jar` | B | `TclAudioServiceEx.setDevMode` delega en `AudioService.setDevMode`, cuyo cuerpo no se localizó |
+| `TAudioManager.addOnAudioFormatChangedListener(OnAudioFormatChangedListener)`, `addOnSoundBarEventChangedListener(OnSoundbarEventChangedListener)`, `addOnWirelessSpeakerStateListener(…)` y sus `remove…` | Avisos | `tcl-framework` | B | Ninguna vista |
+| `android.hardware.hdmi.TclHdmiTvClient.isSupportEarc() : boolean`, `getEarcStatus() : int` (`EN_EARC_STATUS_ARC=0`, `_EARC=1`, `_HANDSHAKE=2`), `setEqMode(int)`, `getTrdDeviceEqMode()`, `setNightMode(int)`, `setBassEnhancer(int)`, `setDialogEnhancer(int)`, `resetSoundSettings()`, `enableSystemCecControl(boolean)` (39 métodos) | eARC/ARC y barra de sonido por CEC | `tcl-framework` | B | Servicio `hdmi_control`. En `TclHdmiControlService$TclBinderService` no se vio comprobación en `getEarcStatus`, `isSupportEarc`, `setEqMode`, `enableSystemCecControl`; `initBinderCall`/`enforceAccessPermission` solo aparecen en `portSelect` y `sendVolumeKeyEvent` |
+| `com.realtek.tv.Tv.setAudioVolume(int)`, `setAudioVolumeMute(boolean)`, `getAudioMute(int)`, `isEARCSupport()`, `getEARCEnable()` / `setEARCEnable(boolean)`, `getHDMIArcPort()`; `com.realtek.tv.AQ.*` (88 métodos) | Capa Realtek | `rtk-framework` | A | HAL `vendor.rtk.tv.IAidlRtkTvService/default` |
+
+Features que el firmware declara ausentes en `tcl_features.xml`: `com.tcl.software.hdmi_earc`, `hdmi_cec_link_earc`, `hdmi_cec_control_earc`. Presentes: `audio_arc`, `audio_volume`, `audio_devices`, `audio_effect`.
+
+## Entradas y fuentes
+
+`com.tcl.tvinput` (521 clases, la mayoría `com.tcl.dtv.*` de sintonización) y `com.tcl.hdmi` (594; repite `com.tcl.tvinput.*` y añade `com.tcl.hdmi.*` y `com.tcl.dfx.*`). El binder sale de `ServiceManager.getService("tcl_tvinput")` (`com.tcl.dtv.ITService`) y, como respaldo, de `vendor.tcl.tvinput.extend.ITvExtendService/default`, con `getService(String)` para cada submódulo.
+
+| clase.método(firma) | Qué hace | Librería | Cargable | Comprobaciones vistas |
+| --- | --- | --- | --- | --- |
+| `com.tcl.tvinput.TTvInputMgr.getInstance(Context) : TTvInputMgr` | Punto de entrada | `com.tcl.tvinput` | A | Ninguna en la librería |
+| `TTvInputMgr.getTvinputList() : HashMap` | Lista de entradas *(inf.)* | ídem | A | ídem |
+| `TTvInputMgr.getCurrentInputID() : int` / `getLastInputID() : int` | Entrada actual. Lee `Settings.Secure` `"tcl_sys_tv_input_current_device_id"`, sin binder | ídem | A | Ninguna |
+| `TTvInputMgr.getTvInputID(int) : String`; `getDeviceIdByTvInputId(String) : int`; `getDeviceIdByPortId(int)`; `getPortIdByDeviceId(int)`; `static getInputSourceType(String) : int` | Traducción entre id TIF, id de dispositivo y puerto. Constantes `SOURCE_TYPE_ATV=1`, `_DTV=2`, `_AV1=3`, `_HDMI1=15`, `_HDMI2=16`, `_HDMI3=17`, `_HDMI4=18`, `_MEDIACODEC=21` | ídem | A | ídem |
+| `TTvInputMgr.isSrcInsert(int) : boolean`; `getTvInputSignalStatus(int) : boolean`; `getPowerStatus(int) : boolean` | Cable conectado y señal presente | ídem | A | Binder `ITTvInput` |
+| `TTvInputMgr.getSignalInfo(int,int) : int` | Dato de señal por `SIGNAL_TYPE_HDR=0`, `_HRES=1`, `_VRES=2`, `_VSYNC=3`, `_ALLM=4`, `_HDMI_DEVICE=5`, `_HDMI_MODE=6`, `_COLOR_MATRIX=7`, `_PIXEL_FORMAT=8`, `_BIT_DEPTH=9`, `_DOLBY_GAME=11`, `_FRAME_STATE=12`. Valores `HDR_TYPE_SDR=0`, `_HDR10=1`, `_HDR10_PLUS=2`, `_HLG=3`, `_DOLBY=5` | ídem | A | ídem |
+| `TTvInputMgr.getHdmiDeviceInfo() : Bundle`; `getHdmiDeviceInfoByDeviceId(int)`; `getVideoFormatInfo() : Bundle`; `getVideoFormatInfoByDeviceId(int)`; `getHdmiSupportFeature(int) : Bundle` | Dispositivo HDMI y formato (claves del `Bundle` sin leer) | ídem | A | ídem |
+| `TTvInputMgr.getHdmiEdidVer(int)` / `setHdmiEdidVer(int,int)`; `getHdmi144VrrConfig(int)` / `setHdmi144VrrConfig(int,boolean)`; `setHdmiVrrConfig(int,int)`; `isQmsMode(int)` / `setQmsMode(int,boolean)` | Versión EDID y VRR por puerto (`EDID_VERSION_AUTO=0`, `_1_4=1`, `_2_0=2`, `_2_1=3`) | ídem | A | ídem. Cambiar EDID reinicia el enlace HDMI: no para un Centro de control |
+| `com.tcl.tvinput.TEventManager.addEventCallback(int,TEventManager$EventCallback) : boolean` / `removeEventCallback(…)` (estáticos) | Eventos con `TVINPUT_MODULE=11`: `EVENT_SOURCE_PLUGIN_STATUS=1`, `EVENT_SOURCE_CHANGED_START=2`, `_END=3`, `EVENT_SIGNAL_LOCK_STATUS=4`, `EVENT_SIGNAL_FORMAT_CHANGED=5` | ídem | A | ídem |
+| `com.tcl.tvinput.TTvSystem.getInstance(Context)`; `getProperty(String,String)` / `setProperty(String,String)`; `systemAuthorized(String) : boolean`; `isScreenCaptureAllowed()` | Propiedades del subsistema de TV | ídem | A | Sin leer |
+| `com.tcl.impl.tvsdk.TvHdmiController.getInstance()`; `getHdmiFeatureSupport(int) : Bundle`; `getOption(int,int) : byte[]` / `setOption(int,int,int,byte[])`; `addCallBack(TvHdmiController$TvHdmiCallback)` | HDMI de bajo nivel (`OPTION_EARC_IS_SUPPORT=0`, `OPTION_EARC_STATUS=1`, `HDMI_SUPPORT_ARC=1`, `_EARC=2`, `_ALLM=8`, `_VRR=16`) | `com.tcl.tvinput` / `com.tcl.hdmi` | A | ídem |
+| `com.tcl.hdmi.THdmiEdidManager.*`, `com.tcl.dfx.THdmiDfxManager.*` (diagnóstico y reparación HDMI) | EDID y diagnóstico | `com.tcl.hdmi` | A | Sin leer. **No para apps** |
+| `com.realtek.tv.Tv.setInputSource(Context,String) : void` | Construye un `Intent` `android.intent.action.VIEW` a `com.realtek.tv/com.realtek.tv.MainActivity` con extra `"change_source"` | `rtk-framework` | A | **Inútil aquí**: el paquete `com.realtek.tv` no está instalado |
+| `com.realtek.tv.Tv.getInputSourceList(Context) : List` | Solo `TvInputManager.getTvInputList()` de Android | ídem | A | API pública |
+
+No hay ningún método "cambiar a HDMI n" en `TTvInputMgr`. El cambio de fuente pasa por TIF (`TvView.tune` sobre `com.tcl.tvinput/.TvPassThroughService`, protegido con `BIND_TV_INPUT`) o por las apps del sistema. Componentes exportados declarados en sus manifiestos, sin permiso:
+
+| Componente | Acciones |
+| --- | --- |
+| `com.tcl.suspension/.ui.main.InputActivity` (alias) | `com.android.tv.action.VIEW_INPUTS`, `com.tcl.suspension.VIEW_INPUTS` |
+| `com.tcl.suspension/.ui.main.MainActivity` | `com.tcl.suspension.action.main` |
+| `com.tcl.tv/com.tcl.player.TVActivity` | `android.intent.action.VIEW`, `tcl.sys.intent.action.TV` |
+| `com.tcl.dashboard/.MainActivity` | `com.tcl.dashboard.MAIN` |
+| `com.tcl.gamebar/.activity.MainActivity` | `com.tcl.gamebar.main`, `com.tcl.settings.action.start.ACTION_GAMEBAR_HDMI` |
+| `com.android.tv.settings/com.tcl.settings.PictureActivity` | `android.settings.DISPLAY_SETTINGS` |
+| `com.android.tv.settings/com.tcl.settings.SoundActivity` | `com.android.tv.action.VIEW_SOUND_SETTINGS` |
+| `com.android.tv.settings/com.tcl.settings.channel.InputControlActivity` | `com.android.tv.settings.CEC` |
+| `com.android.tv.settings/com.tcl.settings.device.SystemActivity` | `com.android.tv.settings.gamemode` |
+
+## Energía
+
+| clase.método(firma) | Qué hace | Librería | Cargable | Comprobaciones vistas |
+| --- | --- | --- | --- | --- |
+| `tcl.os.TPowerManager.getInstance()`; `getBackLightState() : int`; `setBackLightState(int) : int`; `setBackLightStateWithReason(int,String) : int` | Apagar y encender la retroiluminación (pantalla apagada con audio) *(inf.)*. Binder: `IPowerManager.getTclInnerService()` sobre `power` | `tcl-framework` | B | `TclPowerManagerServiceEx`: `enforceCallingOrSelfPermission("tcl.permission.ACCESS_EXTENDED_POWER")`, `prot=signature` |
+| `TPowerManager.getStrEnabled() : boolean` / `setStrEnabled(boolean) : boolean` | Suspensión a RAM | ídem | B | `getStrEnabled`: solo `clearCallingIdentity`. `setStrEnabled`: ninguna vista |
+| `tcl.app.TAlarmManager.getInstance(Context)`; `getPowerOnTime() : long`; `setPowerOnTime(long,PendingIntent) : void` | Encendido programado | ídem | B | `setPowerOnTime`: `"android.permission.SET_TIME"` (`signature\|privileged\|role`) |
+| `tcl.os.TRunningTimeManager.getSystemRunningTime() : long`; `resetSystemRunningTime()` | Horas de uso | ídem | B | `"tcl.permission.ACCESS_EXTENDED_RUNNINGTIME"`, `prot=signature` |
+| `com.realtek.tv.SystemControl.getInstance()`; `setPanelOnOff(boolean) : boolean`; `workingToPanelOff()`; `panelOffToWorking()`; `panelOffToLowPowerMode()`; `lowPowerModeToWorking()`; `getMntPowerMode()` / `setMntPowerMode(int)`; `setLedsBlink(boolean,int,int)` | Estados de energía del panel | `rtk-framework` | A | HAL `vendor.rtk.tv.IAidlRtkTvService/default`. Riesgo real de dejar la pantalla negra |
+
+No aparece ningún método de temporizador de apagado en las librerías. Lo que existe es interno de Ajustes: receptor `com.tcl.settings.receiver.ShortCutMenuReceiver` (acciones `com.tcl.action.sleep`, `com.tcl.showsetting`, `com.tcl.showsource`, `com.tcl.ShortcutKey`) protegido con `com.tcl.settings.permission.ShortCutMenuReceiver` (`signature`), y `TimerManagerBroadcastReceiver` (`com.tcl.PowerOffTimeCount`) con `com.tcl.settings.permission.TimerManagerBroadcastReceiver` (`signature`). Los servicios `com.realtek.power.IEnergyMode/default`, `IHibernate`, `ILowPower`, `IPowerOnReason` están registrados pero no hay cliente Java en los jar analizados.
+
+## Red
+
+| clase.método(firma) | Qué hace | Librería | Cargable | Comprobaciones vistas |
+| --- | --- | --- | --- | --- |
+| `android.net.TclConnectivityManager.<init>(Context)`; `getNetworkQuality() : int`; `registerNetQoeCallback(ITclConnectivityManager$NetworkQoeCallback)` / `unregister…`; `reportAppQoe(int,int,int,String)` | Calidad de red. Servicio `tcl_connectivity` | `tcl-framework` | B | No se localizó comprobación en `TclConnectivityService` |
+| `tcl.net.wifi.TWifiManager.getInstance(Context)`; `allowAutojoinGlobal(boolean)` | Auto-conexión Wi‑Fi | ídem | B | Sin leer |
+| `tcl.net.wifi.p2p.TWifiP2pManager.getInstance()`; `setP2pListen(boolean) : boolean`; `setMiracastMode(int)`; `getP2pType() : int`; `setDeviceName(…)` | Wi‑Fi Direct y Miracast | ídem | B | Sin leer |
+| `android.heraeye.impl.wifi.HeraWifiImpl`, `android.heraeye.impl.ethernet.HeraEthernetImpl` (`handleEvent(Parcel)`, `handleFunction(int,HeData)`) | Diagnóstico interno "Hera" | `tcl-he-wifi`, `tcl-he-ethernet` | B | **No para apps** |
+
+Para Wi‑Fi y Ethernet no hay nada mejor que las API públicas (`ConnectivityManager`, `WifiManager`).
+
+## Bluetooth
+
+Solo `android.heraeye.impl.bluetooth.HeraBluetoothImpl` (`tcl-bluetooth.jar`, nivel B): reparación del mando (`saveRcRepairInfo(HeData)`, `sendRcConnectionErrorMsg(HeData)`), no una API de usuario. Usar `BluetoothAdapter` y los permisos de Android. Acciones de sistema vistas en Ajustes: `tcl.sys.intent.action.BT_ON_REQUEST`, `tcl.sys.intent.action.BT_PAIR_REQUEST`.
+
+## Información del dispositivo
+
+| clase.método(firma) | Qué hace | Librería | Cargable | Comprobaciones vistas |
+| --- | --- | --- | --- | --- |
+| `tcl.os.TDeviceInfoEx.getInstance()`; `getProjectName() : String`; `getSoftwareVersion() : String`; `getClientType() : String`; `getBoardInfo() : String`; `getBrand() : String`; `getProjectID() : int`; `getConfigSubVersion() : String` | Modelo interno, versión de firmware, placa. Delegan en `tcl.os.TDeviceInfo` → servicio `deviceinfo` (`getBrand` lee una propiedad con `TSystemProperties.get`) | `tromlib` | A | `DeviceInfoManagerService`: ninguna en estos métodos |
+| `tcl.os.TComponentInfoEx.getInstance()`; `getComponentVersion(int) : String`; `getComponentInfo(int) : String`; `getComponentSubVersion() : String` | Versiones por partición: `SYSTEM_COMPONENT=1`, `PRODUCT_COMPONENT=2`, `VENDOR_COMPONENT=3`, `CONFIG_COMPONENT=4` | `tromlib` | A | Servidor `tcl_componentinfomanager` sin leer; existe el permiso `com.tvos.permission.ACQUIRE_COMPONENT_INFO` (`signature`) |
+| `tcl.os.TDeviceInfo.getSn() : String`; `getDeviceID()`; `getMACAddress()` | Número de serie, id, MAC | `tcl-framework` | B | `enforceCallingPermission("com.tvos.permission.READ_DEVICE_INFO")`, `signature\|privileged`. No están en `TDeviceInfoEx` |
+| `TDeviceInfo.hasFairplayKey()`, `hasMFiKey()`, `hasQDAKey()` | Claves instaladas | ídem | B | `"com.tvos.permission.ACCESS_DEVICE_KEY"`, `signature\|privileged` |
+| `TDeviceInfo.setPowerOnMode(int)`; `setDeviceUUID(String)`; `resetFactoryData()` | Escrituras de fábrica | ídem | B | `com.tvos.permission.SET_POWER_MODE`, `SET_DEVICE_UUID`, `ALLOW_FACTORY_RESET` respectivamente (`signature\|privileged`). **No para apps** |
+| `TDeviceInfo.cleanE2promInfo()`; `setProjectID(int)`; `setWatchDogEnabled(boolean)` | Escrituras de fábrica | ídem | B | **Ninguna vista** en `DeviceInfoManagerService`. Peligrosas; solo las frena el bloqueo de API ocultas (y SELinux, sin comprobar). **No para apps** |
+| `com.tcl.deviceinfomanager.TclDeviceInfoManager.getInstance(Context)`; `getUDID()`, `getOAID()`, `getVAID()`, `getAAID()`, `isSupported()` | Identificadores publicitarios. Servicio `tcl_uniquedeviceid_manager`, que **no** aparece en `service list` | `tcl-framework` | B | Permisos `com.tcl.permission.TCL_DEVICEINFO_GETUDID`, `…SETOAIDSTATUS` (`signature`) |
+| `tcl.os.TSystemProperties.get(String) : String`, `getInt`, `getBoolean`, `set(String,String)` | `android.os.SystemProperties` sin más | `tcl-framework` | B | Ninguna; manda SELinux por propiedad |
+| `com.realtek.system.RtkProjectConfigs` (245 métodos), `RtkConfigs`, `RtkFrameworkConfigs` | Configuración de proyecto Realtek | `rtk-framework` | A | HAL `vendor.realtek.rtkconfigs.IRtkProjectConfigs/default` e `IRtkTvConfigs/default` |
+
+## Sistema e interfaz
+
+| clase.método(firma) | Qué hace | Librería | Cargable | Comprobaciones vistas |
+| --- | --- | --- | --- | --- |
+| `tcl.os.lock.TLockManager.getInstance()`; `isPasswordInitialized(int)`, `checkPassword(String,int)`, `setPassword(String,int)`, `cleanupPassword(int)`; variantes `…SystemPassword` | PIN de control parental. Servicio `lock_manager` | `tcl-framework` | B | Implementación no localizada. Permisos existentes: `com.tvos.permission.ACCESS_SYSTEM_PASSWORD`, `MODIFY_SYSTEM_PASSWORD` (`signature\|privileged`) |
+| `tcl.app.TAccessControlManager.getInstance()`; `getAppLockPackages(int) : List`; `addAppLockPackages(List,int)`; `removeAppLockPackages(List,int)` | Bloqueo de apps | ídem | B | Sin leer |
+| `com.android.server.mode.TclModeManager.getInstance()`; `checkIfInGameMode()`, `checkIfInHomeMode()`, `checkIfInSportMode()`, `checkIfInInterceptedMode()` | Modo global actual. Servicio `tcl_mode_manager` | ídem | B | Implementación no localizada |
+| `tcl.view.TSurfaceControl.screenshot(Rect,int,int,int) : Bitmap` | Captura con `ScreenCapture.captureDisplay` | ídem | B | Ninguna propia; Android exige `READ_FRAME_BUFFER` |
+| `tcl.view.TWindowManager.getTvMaskShowStatus()`, `setTvMaskShowOverlay(boolean,String)`, `updateUhdActivityList(String,ArrayList)` | Máscara de TV y lista de actividades 4K | ídem | B | Sin leer. Permiso existente: `com.tvos.permission.ACCESS_EXTENDED_WINDOW` (`signature`) |
+| `tcl.app.TActivityTaskManager.moveToTMultiTask(Context,Rect)`, `resizeTMultiTask(Context,Rect)` | Multiventana TCL | ídem | B | Sin leer |
+| `tcl.os.tguard.TGuardManager.*` (`killPidByUser`, `reclaimMem`, `getAppType(String)`, …) | Gestor de memoria y procesos. Servicio `tguard` | ídem | B | Sin leer. **No para apps** |
+| `tcl.widget.TToast`, `TDialog`, `TLoadingDialog`, `TButton`, `TSeekBar`, … | Widgets con el estilo de TCL | ídem | B | No aplica |
+| `android.provider.TclSettings` (`$Global`, `$Secure`, `$System`) | Solo añade "último paquete que modificó la clave": `CALL_METHOD_GET_GLOBAL_MOD_PKG = "GET_global_modify_pkg"`, `…SECURE…`, `…SYSTEM…`, `EXTRA_LAST_MODIFY_PACKAGE`. No define claves | ídem | B | Usa el `SettingsProvider` normal |
+
+El panel rápido, el menú de fuentes y las notificaciones de TCL no tienen API Java en estas librerías: son apps (`com.tcl.dashboard`, `com.tcl.suspension`, `com.tcl.messagebox`) que se cierran entre sí con el servicio de acción `com.tcl.quickmenu.dismiss`. Permisos `normal` declarados que una app puede pedir: `com.tcl.suspension.read`, `com.tcl.settings.permission.NOTIFICATION_READ`, `com.tcl.settings.permission.NOTIFICATION_WRITE`, `com.tcl.ShortcutKey`, `com.tcl.dashboard.ACCESS_MESSAGE_EXT_SERVICE`.
+
+## Otros (existen; no son para apps)
+
+| Área | Clases | Librería | Cargable | Comprobaciones vistas |
+| --- | --- | --- | --- | --- |
+| Motor de la cámara / pantalla giratoria | `tcl.hardware.motor.TMotorManager.getInstance(Context)`: `rotate(int,int)`, `reset(int)`, `getMotorStatus(int)`, `getScreenRotatingState()`, `setLockMode(boolean)`, `upgradeMCUFirmware(…)` | `tcl-motor-framework` | B | `TMotorManagerService`: `"com.tvos.permission.MOTOR"` (`signature`). El servicio `TMotorManagerService` no aparece en `service list` |
+| Cámara | `tcl.tvcamera.TCameraManager` (`getCameraStatus()`, `setCameraStatus(boolean)`, `setZoomStatus(boolean)`, `setAIdetect(AiType)`, `startFwUpgrade(String)`), `tcl.tvcamera.TCameraManagerEx` (`tromlib`: `getCameraStatus()`, `getFramerate()`, `setFramerate(int)`, `setZoomStatus(boolean)`) | `tcl-framework`, `tromlib` | B, A | `TCameraService`: `"com.tvos.permission.USB_CAMERA"` (`signature`) en `setStatus`, `startFwUpgrade`, `startMCUUpgrade` |
+| Hotel | `tcl.os.hotel.THotelManager.setBootLogo(int,String)`; `TDeviceInfo.getHotelModeStatus()`, `verifyHotelPassword(String)` | `tcl-framework` | B | `"com.tvos.permission.TCL_HOTEL_SET_BOOT_LOGO"` (`signature`) |
+| Fábrica | `vendor.tcl.factory.V1_0.IFactory` (HIDL, 88 clases), `vendor.tcl.factory.ext.V1_0.IFactoryExt`; `com.realtek.tv.Factory` (83 métodos); `TDeviceInfo.getFactoryPModeStatus()` | `tcl.factory.hal`, `tcl.factory.hal.ext`, `rtk-framework` | A | HAL de vendor. Puede dejar la tele inservible |
+| Luces | `tcl.hardware.lights.TLightsManager.setLightState(int,int,int,int,int)`, `getLightState(int) : int[]` | `tcl-framework` | B | `"android.permission.CONTROL_DEVICE_LIGHTS"` (`signature\|privileged`) |
+| Firmware y periféricos | `tcl.hardware.TFirmwareManager`, `tcl.hardware.TSubScreenManager`, `tcl.flex.TFlexSpeakerManager` | `tcl-framework` | B | Permisos `com.tvos.permission.UPGRADE_FIRMWARE`, `SUBSCREEN` (`signature`) |
+| Almacenamiento, paquetes, copia | `tcl.os.storage.TStorageManager`, `tcl.pm.TPackageManager`, `tcl.backup.TBackupManager` | `tcl-framework` | B | `tcl.permission.STORAGE_DEVICE_SLEEP` (`signature`) |
+| Reproductores | `tcl.media.mediaplayer.TMediaPlayer` (56 métodos), `tcl.media.pictureplayer.TPicturePlayer`; `com.realtek.media.RtkMediaPlayer` (70) | `tcl-framework`, `rtk-mediaplayer` | B | Sin leer |
+| TV digital | `com.tcl.dtv.*` (escaneo, EPG, PVR, CI, CAS), `com.tcl.analog.TAnalogManager`, `com.realtek.tv.Tv` (618 métodos), `Source` (101), `VSC` (52) | `com.tcl.tvinput`, `rtk-framework` | A | Sin leer. Fuera del alcance de un launcher |
+| HbbTV, Ginga, navegador | `com.tcl.hbbtv.HbbtvServer`, `com.tcl.interactive.*`; `com.tcl.gingad.*`, `tv.mopa.ginga.*`; `com.tcl.tbrowser.*`; `tcl.webkit.*` | `com.tcl.hbbtv`, `com.tcl.gingad`, `com.tcl.ginga.porting`, `com.tcl.tbrowser`, `tcl.webkit` | A (`tcl.webkit`: B) | Sin leer |
+| Diagnóstico Hera | `android.heraeye.impl.*` | `hera-common`, `tcl-diaghung`, `tcl-nvrhung`, `tcl-perf` | B | Interno |
+
+## Referencia: servicios binder
+
+De `service list` (298 entradas). Interfaz entre corchetes tal como la devuelve el sistema; vacío = servicio nativo sin descriptor publicado.
+
+| Servicio | Interfaz | Cliente Java visto |
+| --- | --- | --- |
+| `tcl_tv_display` | `com.tcl.tv.display.ITvDisplayManagerService` (191 métodos) | `com.tcl.tv.display` (A). Binario `/system_ext/bin/tcl_tv_display_service` |
+| `tcl_tvinput` | `com.tcl.dtv.ITService` | `com.tcl.tvinput`, `com.tcl.hdmi` (A) |
+| `hdmi_control` | `android.hardware.hdmi.ITclHdmiControlServiceEx` | `TclHdmiTvClient` (B) |
+| `deviceinfo` | `com.tcl.os.ITclDeviceInfoManager` | `TDeviceInfo` (B), `TDeviceInfoEx` (A) |
+| `tcl_componentinfomanager` | `com.tcl.os.ITclComponentInfoManager` | `TComponentInfo` (B), `TComponentInfoEx` (A) |
+| `lock_manager` | `tcl.os.lock.ITLockManager` | `TLockManager` (B) |
+| `tcl_mode_manager` | `android.mode.ITclModeManager` | `TclModeManager` (B) |
+| `tcl_connectivity` | `android.net.ITclConnectivityService` | `TclConnectivityManager` (B) |
+| `tcl_runningtime_manager` | `android.os.ITRunningTimeManager` | `TRunningTimeManager` (B) |
+| `tcl_hotel_manager` | `tcl.os.hotel.ITHotelManager` | `THotelManager` (B) |
+| `tguard` | `tcl.os.tguard.ITGuardService` | `TGuardManager` (B) |
+| `TCameraService` | `tcl.tvcamera.ITCameraService` | `TCameraManager` (B) |
+| `TFirmwareManagerService` | `tcl.hardware.ITFirmwareManager` | `TFirmwareManager` (B) |
+| `apprecorder` | `android.apprecord.ITclAppRecordService` | `TclAppRecordManagerImpl` (B) |
+| `aio`, `aio_native` | `tcl.aio.ITclAioManager`, `android.aio.ITclAioManagerNative` | `tcl.aio.TAioManager` (`framework.jar`, B) |
+| `recordvideoinfo`, `tvod_scene` | `com.tcl.recordvideoinfo.ITclRecordVideoInfoManager`, `com.tcl.vod.ITVodSceneManager` | `framework.jar` (B) |
+| `cameramotorservice`, `tstreamingservice` | `tcl.tstreaming.ITCameraMotor`, `tcl.tstreaming.ITStreaming` | Ninguno en los jar analizados |
+| `android.heraeye.os.IHeraeye`, `android.heserver`, `hemonitor` | `android.heraeye.os.IHeraeye`, `android.heraeye.IHeService`, `android.heraeye.IHeMonitorManager` | Hera (B) |
+| `audio`, `power`, `lights`, `alarm`, `window`, `activity_task`, `mount`, `package` | Interfaz AOSP con `getTclInnerService()` añadido | `android.media.ITclAudioManager`, `com.tcl.os.ITclPowerManager`, `com.tcl.hardware.lights.ITclLightsManager`, `com.tcl.app.ITclAlarmManager`, `android.view.ITclWindowManager`, `android.app.ITclActivityTaskManager`, `com.tcl.storage.ITclStorageManager`, `com.tcl.content.pm.ITclPackageManager` (B) |
+| `vendor.rtk.tv.IAidlRtkTvService/default` | ídem | `com.realtek.tv.*` de `rtk-framework` (A) |
+| `vendor.realtek.rtkconfigs.IRtkProjectConfigs/default`, `IRtkTvConfigs/default`, `vendor.realtek.hwconfigmanager.IHWConfigManager/default` | ídem | `com.realtek.system.*` (A) |
+| `com.realtek.power.IEnergyMode/default`, `IHibernate/default`, `ILowPower/default`, `IPowerOnReason/default` | ídem | Ninguno |
+| `vendor.tcl.tvinput.extend.ITvExtendService/default` | (vacío) | `com.tcl.dtv.TService` (A) |
+| `vendor.tcl.audio.ITclAudio/default`, `/taudio`, `vendor.tcl.light.ITclLights/default`, `vendor.tcl.display.screencontrol.ITclScreenControl/default`, `vendor.tcl.bootreason.IBootReason/default`, `vendor.tcl.tcldevmanager.ITclDevManager/default`, `vendor.tcl.airplaykey.IAirplayKey/default`, `vendor.tcl.hardware.wifi.supplicant.ITclSupplicant/default`, `vendor.rtk.thal.IRtkThalService/default`, `vendor.realtek.aidl.display.IDisplayManager/default` | (vacío) | Ninguno. HAL de vendor |
+
+## Referencia: content providers de TCL y Realtek
+
+Autoridades de `dumpsys package`; `exported` y permisos leídos de los manifiestos de los APK. Omitidos los `FileProvider` y los inicializadores de androidx. Ninguno se ha consultado.
+
+| Autoridad | Paquete | exported | Permiso de lectura | Permiso de escritura |
+| --- | --- | --- | --- | --- |
+| `com.tcl.providers.config` | `com.tcl.providers.config` | sí | ninguno | ninguno |
+| `com.tcl.suspension` (`SourceOrderProvider`, orden de fuentes *(inf.)*) | `com.tcl.suspension` | sí | `com.tcl.suspension.read` (`normal`) | ninguno declarado |
+| `tvlauncher.config`, `tvlauncher.apprecs`, `tvlauncher.widget`, `suspension_config`, `com.tcl.customer` | `com.tcl.partnercustomizer` | sí | ninguno | ninguno |
+| `com.tcl.settings.slice`, `com.tcl.settings.preference` | `com.android.tv.settings` | sí | ninguno | ninguno |
+| `com.android.tv.settings.device.eco.energymodes` | `com.android.tv.settings` | sí | ninguno | ninguno |
+| `com.android.settings.connectivity.networkchangedetection` | `com.android.tv.settings` | sí | `com.android.settings.connectivity.READ_NETWORK_CHANGE_DATA` | ninguno |
+| `com.tcl.messagebox` | `com.tcl.messagebox` | sí | `com.tcl.messagebox.access` (`signature\|privileged`) | ídem |
+| `com.tcl.ttvs.messagebox.provider` | `com.tcl.ttvs` | sí | `com.tcl.messagebox.access` | ídem |
+| `com.tcl.ttvs.process.provider` | `com.tcl.ttvs` | sí | `com.tcl.ttvs.process` (`signature\|privileged`) | ídem |
+| `com.tcl.ttvs` | `com.tcl.ttvs` | sí | `com.tcl.permission.START_CHECK_SYSTEMUPDATE` (`signature\|privileged`) | ídem |
+| `com.tcl.ttvs.bi.param` | `com.tcl.ttvs` | sí | `com.tcl.bi.param` (`normal`) | ídem |
+| `com.tcl.ttvs.identifier`, `com.tcl.ttvs.proxy.business.data`, `com.tcl.xian.StartandroidService.MyContentProvider` | `com.tcl.ttvs` | sí | ninguno | ninguno |
+| `com.tcl.miracast.provider` | `com.tcl.miracast` | sí | ninguno | ninguno |
+| `com.tcl.hearaid.wireless_speakers` | `com.tcl.hearaid` | sí | `com.tcl.hearaid.wireless_speakers.READ_PROVIDER` | ídem |
+| `com.tcl.tv.SearchContentProvider` | `com.tcl.tv` | sí | ninguno | ninguno |
+| `org.passive.saas_token.cloud_url.providers` | `com.tcl.tv.tclhome_passive` | sí | ninguno | ninguno |
+| `com.tcl.ui_mediaCenter.DataProvider`, `…HistoryDataProvider`, `…ScrapedDataProvider`, `…bookmark.BookMarkProvider` | `com.tcl.ui_mediaCenter` | sí | ninguno | ninguno |
+| `com.tcl.store_ext.slice.OverseaStoreModeSliceProvider` | `com.tcl.esticker` | sí | ninguno | ninguno |
+| `com.tcl.ocean.instructions.specification.slice` | `com.tcl.ocean.instructions` | sí | ninguno | ninguno |
+| `com.tcl.tab.OemTabProvider` | `com.tcl.usercenter` | sí | `com.google.android.apps.tv.launcherx.MULTI_PROCESS_BROADCAST_PERMISSION` | ídem |
+| `atv.hotwordmic`, `tvlauncher.mic` | `com.realtek.hw.configprovider` | sí | ninguno | ninguno |
+| `com.tcl.guard.provider`, `com.tcl.guard.preference` | `com.tcl.guard` | no | — | — |
+| `com.tcl.ttvs.framework.ipc.provider` | `com.tcl.ttvs` | no | — | — |
+
+## Límites
+
+Lo que la plataforma claramente no ofrece a una app sin firma de sistema:
+
+- **Sonido**: ningún ajuste (modo, ecualizador, salida, S/PDIF) está en una librería de nivel A. Todo es `TAudioManager` (API oculta `blocked`) y el servidor pide `android.permission.MODIFY_AUDIO_ROUTING`. HOME solo tiene `AudioManager` y el `Intent` `com.android.tv.action.VIEW_SOUND_SETTINGS`.
+- **Pantalla apagada con audio / reposo**: `TPowerManager.setBackLightState` exige `tcl.permission.ACCESS_EXTENDED_POWER` (`signature`). La alternativa Realtek (`SystemControl.setPanelOnOff`) va por un HAL de vendor.
+- **Temporizador de apagado**: sin API; los receptores de Ajustes están protegidos con permisos `signature`.
+- **Cambio directo de fuente**: no hay método en `TTvInputMgr`; `com.realtek.tv.Tv.setInputSource` apunta a un paquete que no existe aquí. Queda TIF o lanzar `com.android.tv.action.VIEW_INPUTS`.
+- **Número de serie, MAC, id de dispositivo**: `com.tvos.permission.READ_DEVICE_INFO` (`signature|privileged`).
+- **Control parental, bloqueo de apps, luces, motor, cámara, hotel, firmware, fábrica**: permisos `signature` o `signature|privileged` en todos los casos leídos.
+- **Clases del BOOTCLASSPATH de TCL**: marcadas `blocked`; con `targetSdk 36` no son un camino soportado.
+- **eARC y enlace CEC↔eARC**: declarados como `unavailable-feature` en `tcl_features.xml`.
+- **Claves `tcl_sys_*` de `Settings`**: `TclSettings` no añade ninguna vía de escritura; siguen las reglas del `SettingsProvider` (`WRITE_SECURE_SETTINGS` es `signature|privileged|development|installer|role`).
+
+## Sin comprobar
+
+Todo lo siguiente necesita una prueba en la tele:
+
+1. Que `com.tcl.tvinput`, `com.tcl.hdmi`, `tromlib` y `rtk-framework` carguen con `<uses-library>` igual que `com.tcl.tv.display`, y que SELinux permita a HOME encontrar `tcl_tvinput`, `deviceinfo`, `tcl_componentinfomanager` y `vendor.tcl.tvinput.extend.ITvExtendService/default`.
+2. Que `tromlib` se trate como dominio de plataforma (sus llamadas internas a clases `blocked` no fallan). Prueba mínima: `tcl.os.TDeviceInfoEx.getInstance().getProjectName()`.
+3. Qué comprueba el servicio nativo `tcl_tv_display` en cada método distinto de `getBacklight`/`setBacklight`. El binario no se pudo leer (`Permission denied`).
+4. Los valores `int`: modos de imagen de `getPictureMode()`, el primer parámetro `int` de `TvPqManager`, el argumento de `setLightSensorOnoff` y `setLowBlueRay`, rangos de cada ajuste, y los `ordinal()` de los enums.
+5. Las claves de los `Bundle` de `getHdmiDeviceInfo()`, `getVideoFormatInfo()` y `getHdmiSupportFeature(int)`; el contenido del `HashMap` de `getTvinputList()`.
+6. Si `Settings.Secure "tcl_sys_tv_input_current_device_id"` es legible por una app con `targetSdk 36`.
+7. La política de API ocultas del dispositivo (`Settings.Global hidden_api_policy` y exenciones); no se consultó. Si está relajada, el nivel B pasa a ser alcanzable.
+8. La lectura estática de `setAudioOption` (comprobación de `MODIFY_AUDIO_ROUTING` evaluada tras `clearCallingIdentity`). Aunque fuese cierta, llegar al método exige saltarse el bloqueo de API ocultas.
+9. Las implementaciones no localizadas: `lock_manager`, `tcl_mode_manager`, `tcl_connectivity`, `AudioService.setDevMode`, y los servicios que `service list` no muestra (`tcl_uniquedeviceid_manager`, `TMotorManagerService`, `TSubScreenManagerService`, `ipel`, `tcl_flex`).
+10. Que los `Intent` de la tabla de componentes exportados abran lo que su nombre sugiere, y qué columnas y URIs exponen los providers sin permiso (`com.tcl.providers.config`, `com.tcl.suspension`).
+11. Cualquier cosa de `com.realtek.tv.*`: aparte de SELinux, hay `System.exit` en al menos un cuerpo (`PQ.setBacklight`).
+
+## Cómo se obtuvo
+
+Jar extraídos con `adb pull` (27 de TCL/Realtek más `framework.jar` y `services.jar` para seguir las llamadas), `dexdump` de la imagen `lume-toolchain`, y cinco scripts pequeños: firmas públicas por clase, cuerpos de método condensados, nombre de servicio por método, cadenas de permiso por método y decodificador de `hiddenapi_class_data`. Los permisos y su nivel salen de `dumpsys package`; `pm list permissions -f` falla en esta tele con `NullPointerException`. Los volcados no están en el repositorio; se regeneran en unos minutos con los mismos pasos.

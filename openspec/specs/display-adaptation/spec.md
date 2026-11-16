@@ -4,7 +4,7 @@
 Garante que o lume apresente o mesmo layout, nítido e legível, em TVs de 30" a 60" com resolução de 720p a 4K, sem pagar memória de 4K.
 
 ## Variante HOME para a TCL 55Q5K
-Nesta variante pessoal, o buffer de renderização volta a 1920×1080 (limite máximo). A GPU da TV (PowerVR BXE-4-32) não preenche um quadro inteiro de 1080p com vidro a cada 16 ms (mediana de ~37 ms), por isso cada quadro redesenha apenas o que mudou: a lista de desenho é comparada com a do quadro anterior, o retângulo da diferença (unido aos dos quadros que a idade do buffer, `EGL_EXT_buffer_age`, pede) vira o `glScissor` e a região de `EGL_KHR_partial_update`. Trocas de textura (ícones, papel de parede, atlas refeito) e buffers de idade desconhecida forçam o quadro inteiro. Medido na TCL navegando na primeira fileira: mediana 16,7 ms, p95 17,0 ms em 1920×1080.
+Nesta variante pessoal, o buffer de renderização volta a 1920×1080 (limite máximo). A GPU da TV (PowerVR BXE-4-32) não preenche um quadro inteiro de 1080p com vidro a cada 16 ms (mediana de ~37 ms), por isso cada quadro redesenha apenas o que mudou: a lista de desenho é comparada com a do quadro anterior, o retângulo da diferença (unido aos dos quadros que a idade do buffer, `EGL_EXT_buffer_age`, pede) vira o `glScissor` e a região de `EGL_KHR_partial_update`. Trocas de textura (ícones, papel de parede, atlas refeito) e buffers de idade desconhecida forçam o quadro inteiro. Medido na TCL navegando na primeira fileira: mediana 16,7 ms, p95 17,0 ms em 1920×1080. O contexto é OpenGL ES 3.2 quando a TV o tem (3.0 e 2.0 como alternativas); os shaders continuam em GLSL ES 1.00.
 
 ## Requirements
 

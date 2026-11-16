@@ -11,8 +11,9 @@ pub use batch::{
     QUAD_INDICES,
 };
 pub use geometry::Rect;
-pub use gles2::Gles2Backend;
+pub use gles2::{cover_size, Gles2Backend};
 pub use list::{Cmd, DisplayList, RectCmd, RectKind, TexturedCmd};
+pub use shaders::BAYER_4X4;
 
 use crate::theme::Color;
 

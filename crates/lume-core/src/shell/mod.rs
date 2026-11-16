@@ -104,14 +104,20 @@ impl Shell {
     }
 
     pub fn is_active(&self) -> bool {
-        self.text.is_some()
+        self.display.is_some()
     }
 
     /// The window is on screen with this size in pixels: creates what drawing needs.
     pub fn wake(&mut self, width: u32, height: u32) {
         let display = Display::new(width, height);
         match &mut self.text {
-            Some(text) => text.set_scale(display.scale),
+            Some(text) => {
+                text.set_scale(display.scale);
+                // Back from another app with the buffers kept (see `sleep`).
+                if !self.app.is_foreground() {
+                    self.app.returned_to_foreground();
+                }
+            }
             None => {
                 // Without Android's fonts.xml (desktop) there is no system fallback.
                 self.text = Some(match SystemFonts::android() {
@@ -135,16 +141,25 @@ impl Shell {
         self.app.icons.layout()
     }
 
-    /// Another app is in front: drops the glyph atlas and every other buffer used for drawing.
-    pub fn sleep(&mut self) {
+    /// Another app is in front. With `keep`, the glyph atlas and the icons stay, as the host
+    /// keeps their textures: coming back is then immediate, without a splash. Without it they
+    /// are dropped, as [`Shell::release_buffers`] does later when memory runs short.
+    pub fn sleep(&mut self, keep: bool) {
         self.app.went_to_background();
+        self.display = None;
+        self.list = DisplayList::new();
+        if !keep {
+            self.release_buffers();
+        }
+    }
+
+    /// Drops the glyph atlas and the icons; the next [`Shell::wake`] starts from the splash.
+    pub fn release_buffers(&mut self) {
         self.app.icons.clear();
         if let Some(text) = &mut self.text {
             text.release();
         }
         self.text = None;
-        self.display = None;
-        self.list = DisplayList::new();
     }
 
     pub fn viewport(&self) -> Option<Viewport> {
@@ -311,6 +326,46 @@ impl Shell {
     pub fn set_inputs_available(&mut self, available: bool) {
         if available != self.app.inputs_available {
             self.app.inputs_available = available;
+            self.dirty = true;
+        }
+    }
+
+    /// OK is held down (or was let go): see [`LumeApp::set_pressed`].
+    pub fn set_pressed(&mut self, pressed: bool, now_ms: u64) {
+        self.app.set_pressed(pressed, now_ms);
+        self.dirty = true;
+    }
+
+    /// The TV's accessibility choices: see [`LumeApp::reduce_motion`].
+    pub fn set_accessibility(&mut self, reduce_motion: bool, more_contrast: bool) {
+        if (reduce_motion, more_contrast) != (self.app.reduce_motion, self.app.more_contrast) {
+            self.app.reduce_motion = reduce_motion;
+            self.app.more_contrast = more_contrast;
+            self.dirty = true;
+        }
+    }
+
+    /// The backlight and the media volume (0 to 100), for the Control Center's sliders.
+    pub fn set_levels(&mut self, brightness: u8, volume: u8, auto_brightness: Option<bool>) {
+        if (brightness, volume) != self.app.levels || auto_brightness != self.app.auto_brightness {
+            self.app.levels = (brightness, volume);
+            self.app.auto_brightness = auto_brightness;
+            self.dirty = true;
+        }
+    }
+
+    /// The minutes the sleep timer shows; zero once it fired or was cancelled.
+    pub fn set_sleep_timer(&mut self, minutes: u16) {
+        if minutes != self.app.sleep_timer {
+            self.app.sleep_timer = minutes;
+            self.dirty = true;
+        }
+    }
+
+    /// Whether Wi-Fi and Bluetooth are on, for the Control Center.
+    pub fn set_radios(&mut self, wifi: bool, bluetooth: bool) {
+        if (wifi, bluetooth) != self.app.radios {
+            self.app.radios = (wifi, bluetooth);
             self.dirty = true;
         }
     }
@@ -626,15 +681,17 @@ mod tests {
         shell.build_frame(0).unwrap();
         // Open the editor and move the first favorite right: the Apps tab, the Lume tile, its
         // settings, "Tela Início".
-        for key in [Key::Up, Key::Right, Key::Ok, Key::Down] {
-            shell.key(key, 0);
-            shell.build_frame(0).unwrap();
-        }
+        shell.app_mut_for_test().open_apps_tab_for_test();
+        shell.build_frame(0).unwrap();
         assert!(shell.app_mut_for_test().focus_for_test(2999));
         for key in [Key::Ok, Key::Ok] {
             shell.key(key, 0);
             shell.build_frame(0).unwrap();
         }
+        // The Home screen page of the settings: its row for the main row and the order.
+        assert!(shell.app_mut_for_test().focus_for_test(3021));
+        shell.key(Key::Ok, 0);
+        shell.build_frame(0).unwrap();
         let right = 4400 + 1;
         assert!(shell.app_mut_for_test().focus_for_test(right));
         let effects = shell.key(Key::Ok, 100);
@@ -682,7 +739,7 @@ mod tests {
         assert!(!frame.batches.is_empty());
         assert!(shell.text_engine().unwrap().cached_glyphs() > 0);
 
-        shell.sleep();
+        shell.sleep(false);
         assert!(!shell.is_active());
         assert!(shell.text_engine().is_none(), "the glyph atlas is gone");
         assert!(
@@ -726,8 +783,9 @@ mod tests {
         shell.wake(1280, 720);
         shell.build_frame(0).unwrap();
         settle(&mut shell, 16);
-        shell.tick_clock(NOW_SECS + 10);
-        assert!(!shell.frame_due(10_000), "the same minute");
+        // Before the ten seconds after which Home settles, which asks for a frame of its own.
+        shell.tick_clock(NOW_SECS + 9);
+        assert!(!shell.frame_due(9_000), "the same minute");
         shell.tick_clock(NOW_SECS + 61);
         assert!(shell.frame_due(61_000), "a new minute");
         shell.build_frame(61_000).unwrap();
@@ -936,7 +994,7 @@ mod tests {
         shell.wake(1280, 720);
         shell.reserve_dock_icon(NETFLIX, 0).unwrap();
         assert!(shell.app().icons.has_dock(NETFLIX));
-        shell.sleep();
+        shell.sleep(false);
         assert!(!shell.app().icons.has_dock(NETFLIX));
         shell.wake(1280, 720);
         let none = std::collections::HashSet::new();
@@ -974,7 +1032,7 @@ mod tests {
         let mut shell = start(&dir);
         shell.wake(1280, 720);
         shell.reserve_icon(NETFLIX, Art::Icon, 0).unwrap();
-        shell.sleep();
+        shell.sleep(false);
         shell.wake(1280, 720);
         assert!(!shell.app().icons.has(NETFLIX));
         assert_eq!(shell.icons_wanted(&Default::default(), 1).len(), 1);

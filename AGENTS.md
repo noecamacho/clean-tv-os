@@ -9,7 +9,7 @@ La base de verdad para este fork es `docs/llm-wiki/INDEX.md`, seguida de `opensp
 ## Estado actual
 
 - Repositorio propio en GitHub (`noecamacho/clean-tv-os`, rama `main`), con historial nuevo que parte del estado de Lume en su commit `2e7421d`. Los cambios se anotan en `CHANGELOG.md`. No hagas commit ni push salvo petición explícita del usuario.
-- APK firmado: `dist/lume-0.4.0-tvos-release.apk`, instalado como actualización en la TCL. Google TV sigue siendo el Home del sistema, pero el servicio de accesibilidad `HomeKeyService` (activado a petición del usuario) hace que el botón Home y el encendido abran HOME; véase «Botón Home» en `docs/llm-wiki/operations.md`. No deshabilites componentes Google/TCL ni cambies el launcher del sistema sin una petición expresa.
+- APK firmado: `dist/lume-0.9.7-tvos-release.apk`, instalado como actualización en la TCL. Google TV sigue siendo el Home del sistema, pero el servicio de accesibilidad `HomeKeyService` (activado a petición del usuario) hace que el botón Home y el encendido abran HOME; véase «Botón Home» en `docs/llm-wiki/operations.md`. No deshabilites componentes Google/TCL ni cambies el launcher del sistema sin una petición expresa.
 - La firma y el APK de respaldo están fuera de Git, en `~/Projects/.clean-tv-os-private/`. No leas ni imprimas contraseñas y nunca subas esos archivos.
 - El origen (`douglaspands/lume-tv-launcher`) ya no es un remoto; nunca publiques este fork allí.
 
@@ -28,14 +28,14 @@ Desde la raíz del repositorio:
 ```sh
 docker run --rm -v "$PWD:/src" -w /src lume-toolchain:latest sh -lc 'cargo fmt --all && cargo test -q -p lume-core'
 set -a; source ~/Projects/.clean-tv-os-private/signing/credentials.env; set +a
-LUME_VERSION_NAME=v0.4.0-tvos scripts/container-build.sh release
-uv run python scripts/verify-apk.py dist/lume-0.4.0-tvos-release.apk
+LUME_VERSION_NAME=v0.9.7-tvos scripts/container-build.sh release
+uv run python scripts/verify-apk.py dist/lume-0.9.7-tvos-release.apk
 adb connect 192.168.0.229:5555
-adb -s 192.168.0.229:5555 install -r dist/lume-0.4.0-tvos-release.apk
+adb -s 192.168.0.229:5555 install -r dist/lume-0.9.7-tvos-release.apk
 adb -s 192.168.0.229:5555 shell am start -n app.lume.tv/.LumeActivity
 ```
 
-Para una versión nueva, incrementa el parche (`v0.4.1-...` o posterior); Android rechaza un `versionCode` menor. Consulta `docs/llm-wiki/operations.md` antes de instalar o cambiar ajustes.
+Para una versión nueva, incrementa el parche (`v0.9.8-...` o posterior); Android rechaza un `versionCode` menor. Consulta `docs/llm-wiki/operations.md` antes de instalar o cambiar ajustes.
 
 ## Límites y referencias
 

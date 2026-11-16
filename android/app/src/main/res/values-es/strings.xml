@@ -20,6 +20,11 @@
     <string name="settings_key_mapping">Mapeo de control</string>
     <string name="settings_tv_info">Información del televisor</string>
     <string name="settings_about">Acerca de HOME</string>
+    <string name="settings_wallpaper">Fondo de pantalla</string>
+    <string name="settings_tv_section">Ajustes de la tele</string>
+    <string name="settings_network">Red</string>
+    <string name="settings_home_order">Fila principal y orden</string>
+    <string name="settings_all">Todos los ajustes</string>
 
     <!-- Panel de estado de la TV -->
     <string name="stats_title">ESTADO DE LA TV</string>
@@ -80,17 +85,17 @@
     <string name="wallpaper_beach_sunset">Playa al atardecer</string>
     <string name="wallpaper_beach_dawn">Playa al amanecer</string>
     <string name="wallpaper_aurora">Aurora</string>
-    <string name="wallpaper_mountain_stars">Montañas Estrelladas</string>
-    <string name="wallpaper_misty_forest">Bosque Nocturno</string>
+    <string name="wallpaper_mountain_stars">Valle entre montañas</string>
+    <string name="wallpaper_misty_forest">Bosque brumoso</string>
     <string name="wallpaper_glass_facade">Fachada de Cristal</string>
-    <string name="wallpaper_synthwave_grid">Cuadrícula Synthwave</string>
-    <string name="wallpaper_mirror_lake">Lago Espejo</string>
-    <string name="editor_round_favorites">Favoritas redondas</string>
+    <string name="wallpaper_synthwave_grid">Montaña al atardecer</string>
+    <string name="wallpaper_mirror_lake">Castillo en la niebla</string>
+    <string name="editor_six_columns">Seis iconos por fila</string>
     <string name="editor_breadcrumb_edit">Editar</string>
     <string name="editor_title">Editar pantalla de inicio</string>
     <string name="editor_done">Listo</string>
     <string name="editor_favorites_order">Favoritos</string>
-    <string name="editor_favorites_description">Define el orden de las apps en el dock. Selecciona una y usa los botones para moverla o quitarla.</string>
+    <string name="editor_favorites_description">Define el orden de las apps de la fila principal. Selecciona una y usa los botones para moverla o quitarla.</string>
     <string name="editor_use_arrows">Usa las flechas para mover</string>
     <string name="editor_add_app">Añadir app:</string>
     <plurals name="editor_limit_reached">
@@ -191,6 +196,15 @@
     <string name="control_picture">Imagen</string>
     <string name="control_sound">Sonido</string>
     <string name="control_ambient">Modo ambiente</string>
+    <string name="control_sleep_now">Suspender</string>
+    <string name="control_brightness">Brillo</string>
+    <string name="control_volume">Volumen</string>
+    <string name="control_timer">Temporizador</string>
+    <string name="control_timer_off">Desactivado</string>
+    <string name="control_on">Activado</string>
+    <string name="control_auto">Auto</string>
+    <string name="control_mirror">Duplicar pantalla</string>
+    <string name="control_airplay">AirPlay</string>
     <string name="control_apps">Apps</string>
     <string name="control_settings">Ajustes</string>
 </resources>

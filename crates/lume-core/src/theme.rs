@@ -541,7 +541,8 @@ mod tests {
             FONT_SCALE
         );
         let size = |c: &ComponentTheme| THEME.resolve(c, StateFlags::NONE).font_size;
-        assert_eq!(size(&THEME.page_title), 40.0);
+        // tvOS: the title of a screen is quiet, the size of the clock.
+        assert_eq!(size(&THEME.page_title), 28.0);
         assert_eq!(size(&THEME.brand), 28.0);
         // The clock matches the wordmark, at the other end of the top bar.
         assert_eq!(size(&THEME.clock), 28.0);
@@ -624,10 +625,7 @@ mod tests {
         for (name, component) in [
             ("tile", &THEME.tile),
             ("settings-item", &THEME.settings_item),
-            ("editor-row", &THEME.editor_row),
             ("chip", &THEME.chip),
-            ("button", &THEME.button),
-            ("button-secondary", &THEME.button_secondary),
             ("button-danger", &THEME.button_danger),
             ("icon-button", &THEME.icon_button),
         ] {
@@ -647,8 +645,8 @@ mod tests {
         let focus = THEME.resolve(&THEME.button, StateFlags::FOCUS);
         assert_eq!(focus.background, Some(Paint::Solid(vars::PRIMARY)));
         assert_eq!(focus.color, vars::ON_PRIMARY);
-        // The ring stands off the fill, so the primary color still shows against the background.
-        assert!(focus.outline_offset >= 4.0);
+        // tvOS: no ring; the white fill over a shadow is what says where the focus is.
+        assert!(focus.outline.is_none() && focus.box_shadow.is_some());
     }
 
     #[test]

@@ -24,7 +24,9 @@ varying vec4 v_c2;
 
 void main() {
     vec2 device = a_pos_local.xy * u_view.x + u_view.yz;
-    gl_Position = vec4(device.x / u_surface.x * 2.0 - 1.0, 1.0 - device.y / u_surface.y * 2.0, 0.0, 1.0);
+    // w: the distance of a tilted shape's vertex, for interpolation in perspective.
+    float w = 1.0 + a_stops.w;
+    gl_Position = vec4((device.x / u_surface.x * 2.0 - 1.0) * w, (1.0 - device.y / u_surface.y * 2.0) * w, 0.0, w);
     v_local = vec3(a_pos_local.zw, u_view.w / u_view.x);
     v_shape = a_shape;
     v_misc = a_misc;
@@ -95,7 +97,7 @@ pub const TEX_VERTEX: &str = r#"#version 100
 attribute vec4 a_pos_uv; // xy: canvas position, zw: texture coordinates
 attribute vec4 a_color;
 attribute vec4 a_local;  // xy: position relative to the image center, zw: half size
-attribute vec4 a_params; // x: radius
+attribute vec4 a_params; // x: radius, y: tilt distance minus one
 attribute vec4 a_bg;     // premultiplied color the image is composed over
 
 uniform vec4 u_view;     // x: scale, yz: offset (device px), w: edge softness (device px)
@@ -109,7 +111,9 @@ varying vec4 v_bg;
 
 void main() {
     vec2 device = a_pos_uv.xy * u_view.x + u_view.yz;
-    gl_Position = vec4(device.x / u_surface.x * 2.0 - 1.0, 1.0 - device.y / u_surface.y * 2.0, 0.0, 1.0);
+    // w: the distance of a tilted image's vertex, for interpolation in perspective.
+    float w = 1.0 + a_params.y;
+    gl_Position = vec4((device.x / u_surface.x * 2.0 - 1.0) * w, (1.0 - device.y / u_surface.y * 2.0) * w, 0.0, w);
     v_uv = a_pos_uv.zw;
     v_color = a_color;
     v_shape = vec4(a_local.zw, a_params.x, u_view.w / u_view.x);
@@ -160,8 +164,9 @@ void main() {
 }
 "#;
 
-/// Single-tap wallpaper refraction and an edge-weighted UV displacement for glass controls.
-/// It samples the already uploaded wallpaper, avoiding an offscreen render target.
+/// Glass: the blurred copy of the wallpaper behind the control, bent inward in a band at the rim
+/// (the lens of the material) and lit along the rim from the top left. One tap of a small
+/// texture; nothing is rendered offscreen at frame time.
 pub const GLASS_FRAGMENT: &str = r#"#version 100
 #ifdef GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
@@ -182,14 +187,18 @@ float round_rect_distance(vec2 p, vec2 half_size, float radius) {
 }
 
 void main() {
-    vec2 edge = v_local / max(v_shape.xy, vec2(1.0));
-    float strength = smoothstep(0.58, 1.0, max(abs(edge.x), abs(edge.y)));
-    vec2 uv = v_uv - edge * strength * vec2(0.0017, 0.0030);
-    vec3 refracted = texture2D(u_texture, uv).rgb;
     float inset = 0.5 * v_shape.w;
     float d = round_rect_distance(v_local, v_shape.xy - inset, max(v_shape.z - inset, 0.0));
+    vec2 outward = normalize(v_local / max(v_shape.xy, vec2(1.0)) + vec2(0.0001));
+    // The lens: 12 units at the rim, strongest at the edge.
+    float band = clamp(1.0 + d / 12.0, 0.0, 1.0);
+    vec3 color = texture2D(u_texture, v_uv - outward * band * band * 0.012).rgb;
+    // The specular rim, brightest where the edge faces the light or away from it.
+    float rim = clamp(1.0 + d / 1.5, 0.0, 1.0);
+    float light = dot(outward, vec2(-0.7071, -0.7071));
+    color += rim * (0.06 + 0.30 * light * light);
     float coverage = clamp(0.5 - d / v_shape.w, 0.0, 1.0);
-    gl_FragColor = vec4(refracted * v_color.rgb, v_color.a) * coverage;
+    gl_FragColor = vec4(color * v_color.rgb, v_color.a) * coverage;
 }
 "#;
 

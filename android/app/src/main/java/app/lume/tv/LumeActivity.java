@@ -32,13 +32,17 @@ public class LumeActivity extends NativeActivity {
         return LumeBridge.dockIcon(this, packageName, activityName, size);
     }
 
+    /** The Home key, as {@link HomeKeyService} passes it on. */
+    static final String ACTION_HOME_KEY = "app.lume.tv.HOME_KEY";
+
     /** Implemented in Rust (crates/lume-app/src/android/mod.rs). */
     private static native void nativeHomePressed();
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        if (intent != null && intent.hasCategory(Intent.CATEGORY_HOME)) {
+        if (intent != null
+                && (intent.hasCategory(Intent.CATEGORY_HOME) || ACTION_HOME_KEY.equals(intent.getAction()))) {
             try {
                 nativeHomePressed();
             } catch (UnsatisfiedLinkError e) {

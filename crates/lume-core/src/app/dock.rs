@@ -251,11 +251,7 @@ impl LumeApp {
     }
 
     pub(super) fn dock_radius_ratio(&self) -> f32 {
-        if self.config.round_favorites {
-            0.5
-        } else {
-            0.22
-        }
+        0.22
     }
 
     /// The animated position and amplitude of the Magnification now.
@@ -720,28 +716,5 @@ mod tests {
         assert_eq!(initial("  +Disney"), "D");
         assert_eq!(initial("ábaco"), "Á");
         assert_eq!(initial("++"), "");
-    }
-
-    #[test]
-    fn dock_radius_ratio_reflects_round_favorites() {
-        let catalog = crate::catalog::Catalog::new("app.lume.tv");
-        let mut app = LumeApp::new(
-            catalog,
-            crate::usage::UsageHistory::new(),
-            crate::home::config::HomeConfig {
-                favorites: vec!["app1".into()],
-                round_favorites: false,
-                wallpaper: crate::wallpaper::WallpaperId::Aurora,
-            },
-            crate::i18n::Translator::new(&["en"]),
-            crate::clock::WallClock {
-                unix_secs: 0,
-                utc_offset_secs: 0,
-                is_24h: true,
-            },
-        );
-        assert_eq!(app.dock_radius_ratio(), 0.22);
-        app.config.round_favorites = true;
-        assert_eq!(app.dock_radius_ratio(), 0.5);
     }
 }

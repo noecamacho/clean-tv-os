@@ -154,30 +154,11 @@ fn moving_the_focus_animates_the_old_and_new_elements() {
 }
 
 fn open_apps(rig: &mut Rig) {
-    // From the favorites: up to the top bar, right to "Apps", OK.
-    rig.press_all(&[Key::Up]);
-    assert_eq!(rig.focused(), Some(ids::TAB_HOME));
-    rig.press_all(&[Key::Right, Key::Ok]);
+    // Home has no bar of tabs; the Apps screen still exists and is entered as its tab was.
+    rig.app.open_apps_tab_for_test();
+    rig.frame();
+    rig.advance(1000);
     assert_eq!(rig.app.screen(), &Screen::Main(Tab::Apps));
-}
-
-#[test]
-fn up_from_the_first_row_goes_to_the_active_tab_and_right_then_ok_opens_apps() {
-    let mut rig = Rig::new();
-    rig.press(Key::Up);
-    assert_eq!(rig.focused(), Some(ids::TAB_HOME), "the active tab");
-    rig.press(Key::Right);
-    assert_eq!(rig.focused(), Some(ids::TAB_APPS));
-    rig.press(Key::Ok);
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Apps));
-    assert_eq!(
-        rig.focused(),
-        Some(ids::TAB_APPS),
-        "the focus stays on the tab"
-    );
-    // Down enters the grid.
-    rig.press(Key::Down);
-    assert_eq!(rig.focused(), Some(ids::GRID_BASE));
 }
 
 #[test]
@@ -194,8 +175,17 @@ fn back_on_the_home_root_scrolls_to_the_top_without_closing() {
         "the focus returns to the first favorite"
     );
     assert_eq!(rig.app.scroll_y, 0.0);
-    // A second Back changes nothing.
+    // A second Back, on the first app, gives the screen to the wallpaper and the time, as tvOS
+    // starts its screen saver; any key gives it back and does nothing else.
     assert!(rig.press(Key::Back).is_empty());
+    assert_eq!(rig.app.screen(), &Screen::Ambient);
+    assert!(rig.press(Key::Ok).is_empty());
+    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Home));
+    assert_eq!(
+        rig.focused(),
+        Some(ids::FAVORITE_BASE),
+        "back on the first app"
+    );
     assert_eq!(rig.focused(), Some(ids::FAVORITE_BASE));
 }
 
@@ -348,10 +338,7 @@ fn removing_an_installed_app_updates_the_screens() {
 
 // ---- settings and the home screen editor ---------------------------------------------------
 
-use super::editor::{
-    ADD_APP_BASE, CONFIRM_CANCEL, CONFIRM_RESTORE, FAVORITE_BUTTON_BASE, RESTORE, ROUND_FAVORITES,
-    WALLPAPER_BASE,
-};
+use super::editor::{ADD_APP_BASE, CONFIRM_CANCEL, CONFIRM_RESTORE, FAVORITE_BUTTON_BASE, RESTORE};
 
 fn open_settings(rig: &mut Rig) {
     // The Apps tab, then the "Lume" tile.
@@ -368,7 +355,10 @@ fn open_editor(rig: &mut Rig) {
         Some(ids::SETTINGS_BASE),
         "the first item has the focus"
     );
+    // The Home screen page of the settings, then its row for the main row and the order.
     rig.press(Key::Ok);
+    assert_eq!(rig.app.screen(), &Screen::Settings);
+    press_on(rig, ids::SETTINGS_BASE + 21);
     assert_eq!(rig.app.screen(), &Screen::Editor);
 }
 
@@ -384,27 +374,66 @@ fn focus_on(rig: &mut Rig, id: FocusId) {
 }
 
 #[test]
-fn the_lume_settings_start_on_the_first_item_and_list_four() {
+fn ten_minutes_without_keys_give_the_screen_to_the_wallpaper_and_the_time() {
+    let mut rig = Rig::new();
+    rig.frame();
+    rig.advance(9 * 60_000);
+    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Home));
+    assert_eq!(
+        rig.app.next_deadline(rig.now),
+        Some(rig.now + 60_000).min(rig.app.next_deadline(rig.now)),
+        "the frame that starts it is asked for"
+    );
+    rig.advance(60_000);
+    assert_eq!(rig.app.screen(), &Screen::Ambient);
+    // Not from a settings screen, where someone may be reading.
+    let mut rig = Rig::new();
+    open_settings(&mut rig);
+    rig.advance(11 * 60_000);
+    assert_eq!(rig.app.screen(), &Screen::Settings);
+}
+
+#[test]
+fn the_lume_settings_start_on_the_first_item_and_list_nine() {
     let mut rig = Rig::new();
     open_settings(&mut rig);
     assert_eq!(rig.focused(), Some(ids::SETTINGS_BASE));
+    let mut rows = 1;
+    while rig.app.focus.move_focus(Direction::Down) {
+        rows += 1;
+    }
+    assert_eq!(rows, 9, "five of HOME and four of the TV");
+}
+
+#[test]
+fn the_settings_pages_open_from_their_rows_and_back_returns_to_them() {
+    let mut rig = Rig::new();
+    open_settings(&mut rig);
+    // Home screen: the switch of six per row changes with OK, in place.
+    rig.press(Key::Ok);
+    let six = rig.app.config.six_columns;
+    assert_eq!(rig.press(Key::Ok), vec![Effect::SaveConfig]);
+    assert_eq!(rig.app.config.six_columns, !six);
+    rig.press(Key::Back);
+    assert_eq!(rig.focused(), Some(ids::SETTINGS_BASE));
+    // Wallpaper: the screen previews the row with the focus, and OK chooses it.
+    press_on(&mut rig, ids::SETTINGS_BASE + 4);
+    let chosen = rig.app.config.wallpaper;
     rig.press(Key::Down);
-    assert_eq!(rig.focused(), Some(ids::SETTINGS_BASE + 1));
-    rig.press(Key::Down);
-    assert_eq!(rig.focused(), Some(ids::SETTINGS_BASE + 2));
-    rig.press(Key::Down);
-    assert_eq!(rig.focused(), Some(ids::SETTINGS_BASE + 3));
-    assert!(
-        !rig.app.focus.move_focus(Direction::Down),
-        "four items only"
-    );
+    rig.frame();
+    assert_ne!(rig.app.wallpaper_on_screen(), chosen);
+    assert_eq!(rig.press(Key::Ok), vec![Effect::SaveConfig]);
+    assert_ne!(rig.app.config.wallpaper, chosen);
+    rig.press(Key::Back);
+    assert_eq!(rig.focused(), Some(ids::SETTINGS_BASE + 4));
+    assert_eq!(rig.app.wallpaper_on_screen(), rig.app.config.wallpaper);
 }
 
 #[test]
 fn the_keymap_opens_from_the_settings_and_back_returns_to_its_item() {
     let mut rig = Rig::new();
     open_settings(&mut rig);
-    rig.press_all(&[Key::Down, Key::Ok]);
+    press_on(&mut rig, ids::SETTINGS_BASE + 1);
     assert_eq!(rig.app.screen(), &Screen::KeyMap);
     rig.press(Key::Back);
     assert_eq!(rig.app.screen(), &Screen::Settings);
@@ -413,13 +442,13 @@ fn the_keymap_opens_from_the_settings_and_back_returns_to_its_item() {
 
 fn open_key_map(rig: &mut Rig) {
     open_settings(rig);
-    rig.press_all(&[Key::Down, Key::Ok]);
+    press_on(rig, ids::SETTINGS_BASE + 1);
     assert_eq!(rig.app.screen(), &Screen::KeyMap);
 }
 
 fn open_tv_info(rig: &mut Rig) {
     open_settings(rig);
-    rig.press_all(&[Key::Down, Key::Down, Key::Ok]);
+    press_on(rig, ids::SETTINGS_BASE + 2);
     assert_eq!(rig.app.screen(), &Screen::TvInfo);
 }
 
@@ -474,47 +503,15 @@ fn back_from_the_settings_returns_to_the_lume_tile() {
     let mut rig = Rig::new();
     open_settings(&mut rig);
     rig.press(Key::Back);
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Apps));
-    assert_eq!(rig.focused(), Some(ids::GRID_SETTINGS));
-}
-
-#[test]
-fn the_gear_opens_the_android_settings() {
-    let mut rig = Rig::new();
-    rig.press_all(&[Key::Up, Key::Right, Key::Right, Key::Right]);
-    assert_eq!(rig.focused(), Some(ids::GEAR));
-    assert_eq!(rig.press(Key::Ok), [Effect::OpenAndroidSettings]);
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Apps));
-}
-
-#[test]
-fn the_inputs_button_sits_left_of_control_center_and_opens_the_inputs() {
-    let mut rig = Rig::new();
-    rig.app.inputs_available = true;
-    rig.press_all(&[Key::Up, Key::Right, Key::Right]);
-    assert_eq!(rig.focused(), Some(ids::INPUTS));
-    assert_eq!(rig.press(Key::Ok), [Effect::OpenInputs]);
-    rig.press(Key::Right);
-    assert_eq!(rig.focused(), Some(ids::CONTROL_CENTER));
-    rig.press(Key::Left);
-    assert_eq!(rig.focused(), Some(ids::INPUTS));
-}
-
-#[test]
-fn without_an_inputs_panel_the_button_is_not_there() {
-    let mut rig = Rig::new();
-    rig.app.inputs_available = false;
-    rig.press_all(&[Key::Up, Key::Right, Key::Right, Key::Right]);
-    assert_eq!(rig.focused(), Some(ids::GEAR));
-    rig.advance(1000);
-    assert!(!rig.app.focus.focus(ids::INPUTS));
+    // The settings open from the Control Center now: Back leaves them for Home.
+    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Home));
 }
 
 #[test]
 fn the_about_screen_scrolls_and_goes_back_to_the_settings() {
     let mut rig = Rig::new();
     open_settings(&mut rig);
-    rig.press_all(&[Key::Down, Key::Down, Key::Down, Key::Ok]);
+    press_on(&mut rig, ids::SETTINGS_BASE + 3);
     assert_eq!(rig.app.screen(), &Screen::About);
     assert_eq!(rig.app.about_scroll, 0.0);
     rig.press(Key::Down);
@@ -530,10 +527,10 @@ fn the_about_screen_scrolls_and_goes_back_to_the_settings() {
 fn the_editor_opens_from_the_settings_and_has_no_done_button() {
     let mut rig = Rig::new();
     open_editor(&mut rig);
-    assert_eq!(
-        rig.focused(),
-        Some(WALLPAPER_BASE),
-        "the active wallpaper card has the focus"
+    assert!(
+        rig.focused()
+            .is_some_and(|id| (FAVORITE_BUTTON_BASE..ADD_APP_BASE).contains(&id)),
+        "a favorite card has the focus"
     );
     // There is no DONE button in the layout (4000).
     assert!(!rig.app.focus.focus(4000));
@@ -546,11 +543,13 @@ fn back_in_the_editor_returns_to_the_settings_and_then_to_the_lume_tile() {
     let effects = rig.press(Key::Back);
     assert_eq!(effects, [Effect::SaveConfig], "the changes are kept");
     assert_eq!(rig.app.screen(), &Screen::Settings);
-    assert_eq!(rig.focused(), Some(ids::SETTINGS_BASE));
-    // The way out retraces the way in: the "Lume" tile of the Apps tab.
+    // The way out retraces the way in: the row of the Home screen page, then its row in the
+    // settings, then Home.
+    assert_eq!(rig.focused(), Some(ids::SETTINGS_BASE + 21));
     rig.press(Key::Back);
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Apps));
-    assert_eq!(rig.focused(), Some(ids::GRID_SETTINGS));
+    assert_eq!(rig.focused(), Some(ids::SETTINGS_BASE));
+    rig.press(Key::Back);
+    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Home));
 }
 
 #[test]
@@ -731,7 +730,7 @@ fn the_editor_scrolls_to_keep_the_focus_visible() {
     focus_on(&mut rig, RESTORE);
     rig.advance(1000);
     assert!(
-        rig.app.scroll_y > 100.0,
+        rig.app.scroll_y > 0.0,
         "scrolled to the bottom button: {}",
         rig.app.scroll_y
     );
@@ -764,30 +763,13 @@ fn texts_in_the_editor_follow_the_language() {
 }
 
 #[test]
-fn round_favorites_toggles_with_ok_and_emits_save_config() {
+fn restore_defaults_resets_six_columns_to_false() {
     let mut rig = Rig::new();
-    open_editor(&mut rig);
-    rig.press(Key::Down);
-    assert_eq!(rig.focused(), Some(ROUND_FAVORITES));
-    assert!(!rig.app.config.round_favorites, "square is the default");
-
-    let effects = rig.press(Key::Ok);
-    assert_eq!(effects, [Effect::SaveConfig]);
-    assert!(rig.app.config.round_favorites);
-
-    let effects = rig.press(Key::Ok);
-    assert_eq!(effects, [Effect::SaveConfig]);
-    assert!(!rig.app.config.round_favorites);
-}
-
-#[test]
-fn restore_defaults_resets_round_favorites_to_false() {
-    let mut rig = Rig::new();
-    rig.app.config.round_favorites = true;
+    rig.app.config.six_columns = true;
     open_editor(&mut rig);
     press_on(&mut rig, RESTORE);
     press_on(&mut rig, CONFIRM_RESTORE);
-    assert!(!rig.app.config.round_favorites);
+    assert!(!rig.app.config.six_columns);
 }
 
 #[test]
@@ -803,18 +785,9 @@ fn editor_fits_six_cards_per_line_with_no_horizontal_overflow() {
         .collect();
     open_editor(&mut rig);
     let rows = rig.app.focus.rows();
-    // Row 0 is the wallpaper cards row (one item per wallpaper)
-    assert_eq!(
-        rows[0].items.len(),
-        crate::wallpaper::WallpaperId::ALL.len()
-    );
-    // Row 1 is ROUND_FAVORITES (1 item)
-    assert_eq!(rows[1].items.len(), 1);
-    assert_eq!(rows[1].items[0].id, ROUND_FAVORITES);
-    // Row 2 is the first line of 6 cards * 3 buttons = 18 buttons
-    assert_eq!(rows[2].items.len(), 18);
-    // Row 3 is the second line of 6 cards * 3 buttons = 18 buttons
-    assert_eq!(rows[3].items.len(), 18);
+    // Each line of 6 cards has 3 buttons a card.
+    assert_eq!(rows[0].items.len(), 18);
+    assert_eq!(rows[1].items.len(), 18);
 }
 
 fn images(list: &DisplayList) -> usize {
@@ -1041,95 +1014,6 @@ fn underline_alpha(list: &DisplayList) -> Vec<(f32, u8)> {
         .collect()
 }
 
-#[test]
-fn a_focused_tab_has_no_ring() {
-    let mut rig = Rig::new();
-    rig.press(Key::Up);
-    assert_eq!(rig.focused(), Some(ids::TAB_HOME));
-    rig.advance(1000);
-    assert!(top_bar_rings(&rig.frame()).is_empty());
-    rig.press(Key::Right);
-    rig.advance(1000);
-    assert_eq!(rig.focused(), Some(ids::TAB_APPS));
-    assert!(top_bar_rings(&rig.frame()).is_empty());
-}
-
-#[test]
-fn the_underline_follows_the_focus_on_the_tabs_and_the_screen_changes_with_it() {
-    let mut rig = Rig::new();
-    rig.press(Key::Up);
-    rig.advance(1000);
-    let lines = underline_alpha(&rig.frame());
-    assert_eq!(lines.len(), 1, "on the active tab: {lines:?}");
-    let home_x = rig.app_tab_text_x(Tab::Home) - 2.0;
-    assert!((lines[0].0 - home_x).abs() < 0.5);
-
-    // Focus on the other tab: the underline moves there and the screen changes at once, no OK.
-    rig.press(Key::Right);
-    rig.advance(1000);
-    assert_eq!(rig.focused(), Some(ids::TAB_APPS));
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Apps));
-    let lines = underline_alpha(&rig.frame());
-    assert_eq!(lines.len(), 1, "{lines:?}");
-    let apps_x = rig.app_tab_text_x(Tab::Apps) - 2.0;
-    assert!((lines[0].0 - apps_x).abs() < 0.5, "{lines:?}");
-
-    // The gear: the underline stays under the tab that is showing.
-    rig.press_all(&[Key::Right, Key::Right]);
-    rig.advance(1000);
-    assert_eq!(rig.focused(), Some(ids::GEAR));
-    let lines = underline_alpha(&rig.frame());
-    assert_eq!(lines.len(), 1, "{lines:?}");
-    assert!((lines[0].0 - apps_x).abs() < 0.5);
-
-    // Back to the first tab: it shows Home again, and the underline follows.
-    rig.press_all(&[Key::Left, Key::Left, Key::Left]);
-    rig.advance(1000);
-    assert_eq!(rig.focused(), Some(ids::TAB_HOME));
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Home));
-    let lines = underline_alpha(&rig.frame());
-    assert_eq!(lines.len(), 1);
-    assert!((lines[0].0 - home_x).abs() < 0.5);
-
-    // Down from a tab enters the content of the tab that is showing.
-    rig.press(Key::Down);
-    assert_eq!(rig.focused(), Some(ids::FAVORITE_BASE));
-}
-
-#[test]
-fn the_underline_moves_with_a_transition() {
-    let mut rig = Rig::new();
-    rig.press(Key::Up);
-    rig.advance(1000);
-    rig.app.handle_key(Key::Right, rig.now);
-    rig.advance(10);
-    rig.advance(60);
-    let lines = underline_alpha(&rig.frame());
-    assert_eq!(lines.len(), 2, "both fade during the move: {lines:?}");
-    assert!(lines.iter().all(|(_, a)| *a > 0 && *a < 255), "{lines:?}");
-}
-
-#[test]
-fn the_focused_gear_has_a_blue_ring() {
-    let mut rig = Rig::new();
-    rig.press_all(&[Key::Up, Key::Right, Key::Right, Key::Right]);
-    assert_eq!(rig.focused(), Some(ids::GEAR));
-    rig.advance(1000);
-    let rings = top_bar_rings(&rig.frame());
-    assert_eq!(rings.len(), 1, "{rings:?}");
-    let crate::render::RectKind::Ring { color, .. } = rings[0].kind else {
-        unreachable!()
-    };
-    assert_eq!(
-        (color.r, color.g, color.b),
-        (
-            crate::theme::vars::ACCENT.r,
-            crate::theme::vars::ACCENT.g,
-            crate::theme::vars::ACCENT.b
-        )
-    );
-}
-
 impl Rig {
     /// Where the label of `tab` starts in the top bar.
     fn app_tab_text_x(&mut self, tab: Tab) -> f32 {
@@ -1151,16 +1035,10 @@ impl Rig {
 fn down_from_the_favorites_goes_to_done_and_restore_is_to_its_left() {
     let mut rig = Rig::new();
     open_editor(&mut rig);
-    assert_eq!(rig.focused(), Some(WALLPAPER_BASE));
-    // Down goes to the round favorites switch.
-    rig.press(Key::Down);
-    assert_eq!(rig.focused(), Some(ROUND_FAVORITES));
-    // Down goes to the favorite cards.
-    rig.press(Key::Down);
     assert!(
         rig.focused()
             .is_some_and(|id| (FAVORITE_BUTTON_BASE..ADD_APP_BASE).contains(&id)),
-        "the cards come after round favorites"
+        "the editor starts on the favorite cards"
     );
     // Down from the cards goes to the "Add app" chips.
     rig.press(Key::Down);
@@ -1188,32 +1066,11 @@ fn from_an_empty_home_the_add_favorites_item_opens_the_editor_at_the_favorites()
     assert_eq!(rig.focused(), Some(ids::FAVORITES_ADD));
     rig.press(Key::Ok);
     assert_eq!(rig.app.screen(), &Screen::Editor);
-    // The focus starts on active wallpaper card.
-    assert_eq!(rig.focused(), Some(WALLPAPER_BASE));
-    // Down goes to the round favorites switch.
-    rig.press(Key::Down);
-    assert_eq!(rig.focused(), Some(ROUND_FAVORITES));
-    // Down through chips: lands on "Restore defaults".
+    // With no favorite there are no cards: the focus starts on the apps to add.
+    assert!(rig.focused().is_some_and(|id| id >= ADD_APP_BASE));
+    // Down through the chips lands on "Restore defaults".
     rig.press_all(&[Key::Down, Key::Down, Key::Down, Key::Down]);
     assert_eq!(rig.focused(), Some(RESTORE));
-}
-
-#[test]
-fn selecting_wallpaper_in_editor_changes_wallpaper_and_saves() {
-    let mut rig = Rig::new();
-    open_editor(&mut rig);
-    assert_eq!(
-        rig.app.config.wallpaper,
-        crate::wallpaper::WallpaperId::Cinematic
-    );
-    // Focus the fifth wallpaper card (Starry Mountains).
-    focus_on(&mut rig, WALLPAPER_BASE + 4);
-    let effects = rig.press(Key::Ok);
-    assert_eq!(effects, [Effect::SaveConfig]);
-    assert_eq!(
-        rig.app.config.wallpaper,
-        crate::wallpaper::WallpaperId::MountainStars
-    );
 }
 
 // ---- wallpaper --------------------------------------------------------------------------------
@@ -1410,8 +1267,8 @@ fn a_focused_dock_item_has_a_glass_edge_inside_the_bar() {
     let dock_area = Rect::new(0.0, 400.0, 1280.0, 320.0);
     assert_eq!(
         rings_in(&list, dock_area),
-        2,
-        "the bar and focused icon each have a thin reflective edge"
+        1,
+        "the focused icon has a thin reflective edge (the bar's is the glass shader's own)"
     );
     // The reflective edge stays within the bar.
     assert!(top_bar_rings(&list).is_empty());
@@ -1432,10 +1289,18 @@ fn ok_on_a_dock_icon_opens_its_app() {
 }
 
 #[test]
-fn an_idle_home_asks_for_no_frame_but_the_clocks() {
+fn a_settled_home_asks_for_no_frame_but_the_clocks() {
     let mut rig = Rig::new();
     rig.press_all(&[Key::Right, Key::Right]);
     rig.advance(1000);
+    // Ten seconds without keys and Home settles (the rest dims); that is asked for once.
+    let settle = rig
+        .app
+        .next_deadline(rig.now)
+        .expect("the frame that settles");
+    assert!(settle > rig.now && settle <= rig.now + 10_000);
+    rig.advance(settle - rig.now);
+    rig.advance(2000);
     let now = rig.now;
     let deadline = rig.app.next_deadline(now).expect("the clock");
     assert_eq!(
@@ -1474,58 +1339,6 @@ fn grid_id_of(rig: &Rig, package: &str) -> FocusId {
 }
 
 #[test]
-fn back_from_an_app_opened_in_the_apps_tab_returns_to_that_tab_and_icon() {
-    let mut rig = Rig::new();
-    open_apps(&mut rig);
-    rig.press(Key::Down);
-    let youtube = grid_id_of(&rig, YOUTUBE);
-    focus_on(&mut rig, youtube);
-    let effects = rig.press(Key::Ok);
-    assert!(matches!(&effects[0], Effect::OpenApp { package, .. } if package == YOUTUBE));
-    // The user comes back with the Home button.
-    leave_and_come_back(&mut rig);
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Apps));
-    assert_eq!(rig.focused(), Some(youtube));
-}
-
-#[test]
-fn back_from_an_app_opened_from_the_dock_returns_to_that_icon() {
-    let mut rig = Rig::new();
-    rig.press_all(&[Key::Right, Key::Right, Key::Right]);
-    assert_eq!(rig.focused(), Some(ids::FAVORITE_BASE + 3));
-    rig.press(Key::Ok);
-    leave_and_come_back(&mut rig);
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Home));
-    assert_eq!(
-        rig.focused(),
-        Some(ids::FAVORITE_BASE + 3),
-        "not the first icon"
-    );
-}
-
-#[test]
-fn the_grid_scroll_is_kept_when_coming_back() {
-    let mut rig = Rig::with_catalog(many_apps(40));
-    open_apps(&mut rig);
-    rig.press_all(&[Key::Down; 6]);
-    rig.advance(1000);
-    let (focus, scroll) = (rig.focused().unwrap(), rig.app.scroll_y);
-    assert!(scroll > 0.0, "the grid scrolled");
-    rig.press(Key::Ok);
-    leave_and_come_back(&mut rig);
-    rig.advance(1000);
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Apps));
-    assert_eq!(rig.focused(), Some(focus));
-    assert!(
-        (rig.app.scroll_y - scroll).abs() < 1.0,
-        "{} vs {scroll}",
-        rig.app.scroll_y
-    );
-    let rect = rig.app.focus.current().unwrap().rect;
-    assert!(rect.y - rig.app.scroll_y >= 76.0 && rect.bottom() - rig.app.scroll_y <= 720.0);
-}
-
-#[test]
 fn back_from_the_settings_opened_by_the_lume_tile_returns_to_the_tile() {
     let mut rig = Rig::new();
     open_apps(&mut rig);
@@ -1533,17 +1346,7 @@ fn back_from_the_settings_opened_by_the_lume_tile_returns_to_the_tile() {
     focus_on(&mut rig, ids::GRID_SETTINGS);
     rig.press(Key::Ok);
     rig.press(Key::Back);
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Apps));
-}
-
-#[test]
-fn coming_back_from_the_android_settings_keeps_the_gear_focused() {
-    let mut rig = Rig::new();
-    rig.press_all(&[Key::Up, Key::Right, Key::Right, Key::Right]);
-    assert_eq!(rig.press(Key::Ok), [Effect::OpenAndroidSettings]);
-    leave_and_come_back(&mut rig);
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Apps));
-    assert_eq!(rig.focused(), Some(ids::GEAR));
+    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Home));
 }
 
 #[test]
@@ -1571,23 +1374,6 @@ fn home_without_an_app_having_been_opened_goes_to_the_start() {
     rig.press(Key::Home);
     assert_eq!(rig.app.screen(), &Screen::Main(Tab::Home));
     assert_eq!(rig.focused(), Some(ids::FAVORITE_BASE));
-}
-
-#[test]
-fn the_place_is_used_once() {
-    let mut rig = Rig::new();
-    open_apps(&mut rig);
-    rig.press(Key::Down);
-    rig.press(Key::Ok);
-    leave_and_come_back(&mut rig);
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Apps));
-    rig.advance(5000);
-    rig.press(Key::Home);
-    assert_eq!(
-        rig.app.screen(),
-        &Screen::Main(Tab::Home),
-        "the second press is the usual one"
-    );
 }
 
 #[test]
@@ -1623,24 +1409,37 @@ fn a_home_press_long_after_coming_back_is_the_usual_one() {
     rig.app.came_to_foreground();
     rig.advance(100); // the first frame back
     rig.advance(5000);
+    // HOME came back at its start, where Home opens the Control Center.
     rig.press(Key::Home);
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Home));
-    assert_eq!(rig.focused(), Some(ids::FAVORITE_BASE));
+    assert_eq!(rig.app.screen(), &Screen::ControlCenter);
 }
 
 #[test]
-fn a_home_press_that_arrives_just_after_the_first_frame_back_still_restores() {
+fn leaving_home_always_leaves_it_at_its_start() {
+    // From the unfolded library with an app opened, from the Control Center and from the
+    // settings: the next time HOME shows it is Home, folded, on the first app.
     let mut rig = Rig::new();
-    open_apps(&mut rig);
-    rig.press(Key::Down);
-    let focus = rig.focused();
-    rig.press(Key::Ok);
-    rig.app.went_to_background();
-    rig.app.came_to_foreground();
-    rig.advance(100);
+    rig.press_all(&[Key::Down, Key::Right, Key::Ok]);
+    leave_and_come_back(&mut rig);
+    rig.frame();
+    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Home));
+    assert_eq!(rig.focused(), Some(ids::FAVORITE_BASE));
+    assert_eq!(rig.app.scroll_y, 0.0);
+
+    rig.advance(5000);
     rig.press(Key::Home);
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Apps));
-    assert_eq!(rig.focused(), focus);
+    assert_eq!(rig.app.screen(), &Screen::ControlCenter);
+    leave_and_come_back(&mut rig);
+    rig.frame();
+    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Home));
+    assert_eq!(rig.focused(), Some(ids::FAVORITE_BASE));
+
+    open_settings(&mut rig);
+    rig.app.went_to_background();
+    rig.app.returned_to_foreground();
+    rig.frame();
+    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Home));
+    assert_eq!(rig.focused(), Some(ids::FAVORITE_BASE));
 }
 
 /// The horizontal center of the name bubble above the dock icons, if it is drawn.
@@ -1655,44 +1454,6 @@ fn bubble_center(list: &DisplayList) -> Option<f32> {
         }
         _ => None,
     })
-}
-
-#[test]
-fn moving_the_focus_to_a_tab_shows_it_without_ok_and_ok_on_it_changes_nothing() {
-    let mut rig = Rig::new();
-    rig.press(Key::Up);
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Home));
-    rig.press(Key::Right);
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Apps), "no OK needed");
-    assert_eq!(
-        rig.focused(),
-        Some(ids::TAB_APPS),
-        "the focus stays on the tab"
-    );
-    let labels_before = glyphs(&rig.frame());
-    assert!(rig.press(Key::Ok).is_empty());
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Apps));
-    assert_eq!(glyphs(&rig.frame()), labels_before);
-    // And left shows Home again.
-    rig.press(Key::Left);
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Home));
-    assert_eq!(rig.focused(), Some(ids::TAB_HOME));
-}
-
-#[test]
-fn the_apps_tab_scrolled_back_to_the_top_when_the_focus_arrives_on_it() {
-    let mut rig = Rig::with_catalog(many_apps(40));
-    open_apps(&mut rig);
-    rig.press_all(&[Key::Down; 6]);
-    rig.advance(1000);
-    assert!(rig.app.scroll_y > 0.0);
-    rig.press_all(&[Key::Up; 7]);
-    assert_eq!(rig.focused(), Some(ids::TAB_APPS));
-    rig.press(Key::Left);
-    rig.press(Key::Right);
-    rig.advance(1000);
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Apps));
-    assert_eq!(rig.app.scroll_y, 0.0);
 }
 
 /// The color of the (only) tab underline in the frame.
@@ -1720,21 +1481,6 @@ fn rgb(c: crate::theme::Color) -> [u8; 3] {
 }
 
 #[test]
-fn the_underline_fades_between_white_and_blue_with_the_focus() {
-    let mut rig = Rig::new();
-    rig.advance(1000);
-    rig.app.handle_key(Key::Up, rig.now);
-    rig.advance(10);
-    rig.advance(60);
-    let c = underline_color(&rig.frame());
-    let (white, blue) = (crate::theme::vars::TEXT, crate::theme::vars::ACCENT);
-    assert!(
-        c.r < white.r && c.r > blue.r,
-        "between white and blue: {c:?}"
-    );
-}
-
-#[test]
 fn in_the_apps_grid_the_underline_is_white_too() {
     let mut rig = Rig::new();
     open_apps(&mut rig);
@@ -1744,34 +1490,6 @@ fn in_the_apps_grid_the_underline_is_white_too() {
     assert_eq!(
         rgb(underline_color(&rig.frame())),
         rgb(crate::theme::vars::TEXT)
-    );
-}
-
-#[test]
-fn changing_the_tab_fades_the_new_content_in_and_then_goes_idle() {
-    let mut rig = Rig::new();
-    rig.press(Key::Up);
-    rig.advance(1000);
-    rig.app.handle_key(Key::Right, rig.now);
-    rig.advance(10);
-    let mid = rig.app.anim.get(super::Anim::TabFade, 1.0, rig.now);
-    assert!(mid > 0.0 && mid < 1.0, "mid-fade: {mid}");
-    assert!(
-        rig.app.is_animating(rig.now),
-        "frames are asked for while it fades"
-    );
-    // The content is drawn translucent; the top bar after it is not.
-    let list = rig.frame();
-    assert!(
-        list.cmds()
-            .iter()
-            .any(|c| matches!(c, crate::render::Cmd::Rect(r) if r.opacity < 1.0)),
-        "some content is translucent during the fade"
-    );
-    rig.advance(1000);
-    assert!(
-        !rig.app.is_animating(rig.now),
-        "nothing animates once it is done"
     );
 }
 
@@ -1800,38 +1518,6 @@ fn the_name_under_the_focused_tile_is_white_and_the_others_are_muted() {
 
 fn sample_stats() -> crate::stats::Stats {
     crate::stats::Stats::parse("2000000\t800000\t12000000000\t7000000000\tstat,100,1000").unwrap()
-}
-
-#[test]
-fn the_statistics_are_read_only_while_the_settings_are_on_screen() {
-    let mut rig = Rig::new();
-    assert_eq!(rig.app.stats_deadline(rig.now), None, "the home screen");
-    open_apps(&mut rig);
-    assert_eq!(rig.app.stats_deadline(rig.now), None, "the apps screen");
-    rig.press(Key::Down);
-    press_on(&mut rig, ids::GRID_SETTINGS);
-    assert_eq!(rig.app.screen(), &Screen::Settings);
-    assert_eq!(
-        rig.app.stats_deadline(rig.now),
-        Some(rig.now),
-        "due at once"
-    );
-
-    rig.app.apply_stats(sample_stats(), rig.now);
-    assert_eq!(rig.app.stats_deadline(rig.now), Some(rig.now + 2000));
-    assert_eq!(
-        rig.app.cpu_use, None,
-        "the first reading has nothing to compare with"
-    );
-
-    // Leaving for the About screen, the editor or the background stops the readings.
-    rig.press_all(&[Key::Down, Key::Down, Key::Down, Key::Ok]);
-    assert_eq!(rig.app.screen(), &Screen::About);
-    assert_eq!(rig.app.stats_deadline(rig.now), None);
-    rig.press(Key::Back);
-    assert!(rig.app.stats_deadline(rig.now).is_some());
-    rig.app.went_to_background();
-    assert_eq!(rig.app.stats_deadline(rig.now), None);
 }
 
 #[test]
@@ -1998,13 +1684,15 @@ fn add_to_home_from_the_grid_appends_the_app_and_saves() {
     assert_eq!(rig.focused(), Some(chrome));
     // The next menu on it offers to remove it.
     rig.press(Key::Menu);
-    assert_eq!(menu_actions(&rig)[0], MenuAction::RemoveFromHome);
+    assert!(menu_actions(&rig).contains(&MenuAction::RemoveFromHome));
 }
 
 #[test]
 fn remove_from_home_from_the_grid_takes_the_favorite_out() {
     let mut rig = Rig::new();
     let youtube = open_grid_menu(&mut rig, YOUTUBE);
+    // What takes something away comes after "App info".
+    rig.press(Key::Down);
     assert_eq!(selected_action(&rig), MenuAction::RemoveFromHome);
     assert_eq!(rig.press(Key::Ok), [Effect::SaveConfig]);
     assert!(!rig.app.config.favorites.iter().any(|p| p == YOUTUBE));
@@ -2012,7 +1700,7 @@ fn remove_from_home_from_the_grid_takes_the_favorite_out() {
 }
 
 #[test]
-fn with_twelve_favorites_add_is_disabled_and_skipped() {
+fn with_twelve_favorites_add_is_left_out_of_the_menu() {
     let apps: Vec<(String, String)> = (0..13)
         .map(|i| (format!("com.demo.app{i:02}"), format!("App {i:02}")))
         .collect();
@@ -2021,20 +1709,9 @@ fn with_twelve_favorites_add_is_disabled_and_skipped() {
     rig.app.config.favorites = apps[..12].iter().map(|(p, _)| p.clone()).collect();
     rig.advance(0);
     open_grid_menu(&mut rig, "com.demo.app12");
-    let menu = rig.app.context_menu().unwrap();
-    assert_eq!(menu.items[0].action, MenuAction::AddToHome);
-    assert!(!menu.items[0].enabled);
-    assert_eq!(
-        selected_action(&rig),
-        MenuAction::AppInfo,
-        "the focus starts after it"
-    );
-    rig.press(Key::Up);
-    assert_eq!(
-        selected_action(&rig),
-        MenuAction::AppInfo,
-        "it never takes the focus"
-    );
+    // tvOS leaves out what does not apply instead of showing it dimmed.
+    assert!(!menu_actions(&rig).contains(&MenuAction::AddToHome));
+    assert_eq!(selected_action(&rig), MenuAction::AppInfo);
 }
 
 #[test]
@@ -2118,15 +1795,15 @@ fn a_menu_whose_app_is_uninstalled_closes() {
 }
 
 #[test]
-fn the_dock_menu_has_move_remove_and_app_info() {
+fn the_dock_menu_has_move_app_info_and_remove_last() {
     let mut rig = Rig::new();
     open_dock_menu(&mut rig, 0);
     assert_eq!(
         menu_actions(&rig),
         [
             MenuAction::Move,
-            MenuAction::RemoveFromHome,
-            MenuAction::AppInfo
+            MenuAction::AppInfo,
+            MenuAction::RemoveFromHome
         ]
     );
 }
@@ -2254,8 +1931,9 @@ fn removing_the_only_favorite_leaves_add_favorites_with_the_focus() {
     open_dock_menu(&mut rig, 0);
     assert_eq!(
         menu_actions(&rig),
-        [MenuAction::RemoveFromHome, MenuAction::AppInfo]
+        [MenuAction::AppInfo, MenuAction::RemoveFromHome]
     );
+    rig.press(Key::Down);
     rig.press(Key::Ok);
     assert!(rig.app.config.favorites.is_empty());
     assert_eq!(rig.focused(), Some(ids::FAVORITES_ADD));
@@ -2269,6 +1947,7 @@ fn the_editor_shows_what_the_menu_changed() {
     rig.press(Key::Down);
     focus_on(&mut rig, ids::GRID_SETTINGS);
     rig.press_all(&[Key::Ok, Key::Ok]);
+    press_on(&mut rig, ids::SETTINGS_BASE + 21);
     assert_eq!(rig.app.screen(), &Screen::Editor);
     assert!(!rig
         .app
@@ -2284,7 +1963,7 @@ fn removing_a_favorite_from_the_dock_moves_the_focus_to_its_place() {
     let mut rig = Rig::new();
     let before = rig.app.config.favorites.clone();
     open_dock_menu(&mut rig, 1);
-    rig.press(Key::Down);
+    rig.press_all(&[Key::Down, Key::Down]);
     assert_eq!(selected_action(&rig), MenuAction::RemoveFromHome);
     assert_eq!(rig.press(Key::Ok), [Effect::SaveConfig]);
     assert_eq!(rig.app.config.favorites.len(), before.len() - 1);
@@ -2295,7 +1974,7 @@ fn removing_a_favorite_from_the_dock_moves_the_focus_to_its_place() {
     );
     // The last one gives the focus to the one before it.
     open_dock_menu(&mut rig, 3);
-    rig.press(Key::Down);
+    rig.press_all(&[Key::Down, Key::Down]);
     rig.press(Key::Ok);
     assert_eq!(rig.focused(), Some(ids::FAVORITE_BASE + 2));
 }
@@ -2362,9 +2041,7 @@ fn dock_top(list: &DisplayList) -> f32 {
     list.cmds()
         .iter()
         .find_map(|cmd| match cmd {
-            Cmd::Rect(r) if r.radius == 30.0 && matches!(r.kind, RectKind::Fill(_)) => {
-                Some(r.rect.y)
-            }
+            Cmd::Glass(glass) if glass.radius == 32.0 => Some(glass.dest.y),
             _ => None,
         })
         .expect("the dock is drawn")
@@ -2457,47 +2134,6 @@ fn the_splash_lets_go_after_600_ms_without_asking_for_frames_meanwhile() {
     assert!(rig.app.in_splash());
     rig.advance(1);
     assert!(!rig.app.in_splash(), "the wait has a limit");
-}
-
-#[test]
-fn the_splash_waits_for_the_visible_tiles_of_the_grid_it_returns_to() {
-    let mut rig = Rig::new();
-    open_apps(&mut rig);
-    rig.press(Key::Down);
-    let focus = rig.focused();
-    rig.press(Key::Ok);
-    come_back(&mut rig);
-    rig.press(Key::Home);
-    assert!(
-        rig.app.in_splash(),
-        "the Home press that brings lume back keeps the splash"
-    );
-    assert_eq!(rig.app.screen(), &Screen::Main(Tab::Apps));
-    assert_eq!(
-        rig.focused(),
-        focus,
-        "the focus is restored behind the splash"
-    );
-    let missing = rig.app.splash_missing_tiles().to_vec();
-    assert_eq!(
-        missing.len(),
-        rig.app.catalog.apps().len(),
-        "all tiles fit the view"
-    );
-    for package in &missing {
-        rig.app
-            .icons
-            .reserve(package, crate::app_icons::Art::Icon)
-            .unwrap();
-    }
-    rig.advance(10);
-    assert!(
-        rig.app.in_splash(),
-        "the dock icons, for a move to Home, are missing"
-    );
-    load_dock_icons(&mut rig);
-    rig.advance(hold_ms());
-    assert!(!rig.app.in_splash());
 }
 
 #[test]

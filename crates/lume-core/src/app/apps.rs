@@ -319,7 +319,6 @@ mod tests {
 
     #[test]
     fn apps_grid_does_not_split_text_batch_around_lume_tile() {
-        use crate::app::Key;
         use crate::catalog::{Catalog, Discovered};
         use crate::clock::WallClock;
         use crate::display::Display;
@@ -386,9 +385,7 @@ mod tests {
         now += 600;
         draw_frame(&mut app, &mut text, now);
 
-        app.handle_key(Key::Up, now);
-        now += 100;
-        app.handle_key(Key::Right, now);
+        app.open_apps_tab_for_test();
         now += 100;
 
         let list = draw_frame(&mut app, &mut text, now);

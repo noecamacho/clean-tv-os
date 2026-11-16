@@ -70,6 +70,9 @@ pub struct Gles2Backend {
     /// The wallpaper, created the first time a frame draws it and freed with everything else.
     wallpaper: Option<Texture>,
     wallpaper_id: Option<WallpaperId>,
+    /// A small blurred copy of the wallpaper that glass shows enlarged: a blur made once, when
+    /// the wallpaper is loaded, instead of at every frame.
+    wallpaper_blur: Option<Texture>,
     /// The size the wallpaper texture covers, in render-buffer pixels (the 1920x1080 image is
     /// reduced to it when smaller).
     wallpaper_cover: (u32, u32),
@@ -112,7 +115,14 @@ impl Gles2Backend {
                     "a_c2",
                 ],
             )?;
-            let text_program = link(&gl, TEX_VERTEX, TEXT_FRAGMENT, &["a_pos_uv", "a_color"])?;
+            // Every attribute the shared vertex shader reads is named, glyphs included: left to the
+            // linker, the tilt's `a_params` would land on the slot of another attribute's data.
+            let text_program = link(
+                &gl,
+                TEX_VERTEX,
+                TEXT_FRAGMENT,
+                &["a_pos_uv", "a_color", "a_local", "a_params", "a_bg"],
+            )?;
             let image_program = link(
                 &gl,
                 TEX_VERTEX,
@@ -162,6 +172,7 @@ impl Gles2Backend {
                 image: None,
                 wallpaper: None,
                 wallpaper_id: None,
+                wallpaper_blur: None,
                 wallpaper_cover: (0, 0),
                 render_size: (1920, 1080),
                 async_wallpaper: false,
@@ -528,7 +539,7 @@ impl Gles2Backend {
                         .create_texture()
                         .expect("cannot create the wallpaper texture"),
                 };
-                if self.reduce_wallpaper(source, destination, cover) {
+                if self.reduce_wallpaper(source, destination, cover, 1.0) {
                     self.gl.delete_texture(source);
                     self.wallpaper = None;
                     texture = Texture {
@@ -548,6 +559,7 @@ impl Gles2Backend {
             self.wallpaper = Some(texture);
             self.wallpaper_id = Some(id);
             self.wallpaper_cover = cover;
+            self.blur_wallpaper(texture);
         }
         log::info!(
             "wallpaper {} ready: load {} ms, total {} ms ({}x{})",
@@ -557,6 +569,44 @@ impl Gles2Backend {
             self.wallpaper.map_or(0, |t| t.width),
             self.wallpaper.map_or(0, |t| t.height)
         );
+    }
+
+    /// Makes [`Gles2Backend::wallpaper_blur`] from the wallpaper: reduced by eight, then blurred at
+    /// that size. Without a renderable texture, glass shows the sharp wallpaper.
+    ///
+    /// # Safety
+    /// Needs the current GL context; `wallpaper` must belong to it.
+    unsafe fn blur_wallpaper(&mut self, wallpaper: Texture) {
+        if let Some(previous) = self.wallpaper_blur.take() {
+            self.gl.delete_texture(previous.texture);
+        }
+        let quarter = (wallpaper.width.div_ceil(4), wallpaper.height.div_ceil(4));
+        let small = (quarter.0.div_ceil(2), quarter.1.div_ceil(2));
+        let (Ok(first), Ok(mut front), Ok(mut back)) = (
+            self.gl.create_texture(),
+            self.gl.create_texture(),
+            self.gl.create_texture(),
+        ) else {
+            return;
+        };
+        let mut done = self.reduce_wallpaper(wallpaper.texture, first, quarter, 1.0)
+            && self.reduce_wallpaper(first, front, small, 1.0);
+        // Four box passes of three texels are close to a Gaussian: no blocks when enlarged.
+        for _ in 0..4 {
+            done = done && self.reduce_wallpaper(front, back, small, 6.0);
+            std::mem::swap(&mut front, &mut back);
+        }
+        if done {
+            self.wallpaper_blur = Some(Texture {
+                texture: front,
+                width: small.0,
+                height: small.1,
+            });
+        } else {
+            self.gl.delete_texture(front);
+        }
+        self.gl.delete_texture(first);
+        self.gl.delete_texture(back);
     }
 
     /// Draws `source` (the full image) into `destination`, a texture of `cover` pixels, with the
@@ -569,6 +619,7 @@ impl Gles2Backend {
         source: glow::Texture,
         destination: glow::Texture,
         cover: (u32, u32),
+        spread: f32,
     ) -> bool {
         let gl = &self.gl;
         let previous_framebuffer = gl.get_parameter_i32(glow::FRAMEBUFFER_BINDING);
@@ -616,7 +667,11 @@ impl Gles2Backend {
                 gl.active_texture(glow::TEXTURE0);
             }
             // A quarter of the footprint of a destination pixel, in source texture coordinates.
-            let step = [0.25 / cover.0 as f32, 0.25 / cover.1 as f32];
+            // `spread` widens the taps past the footprint: a same-size pass is then a blur.
+            let step = [
+                0.25 * spread / cover.0 as f32,
+                0.25 * spread / cover.1 as f32,
+            ];
             gl.uniform_2_f32(self.reduce_program.u_step.as_ref(), step[0], step[1]);
             gl.uniform_2_f32(
                 self.reduce_program.u_dest.as_ref(),
@@ -832,6 +887,7 @@ impl Gles2Backend {
                 self.atlas,
                 self.image,
                 self.wallpaper,
+                self.wallpaper_blur,
                 self.wallpaper_thumbs,
                 self.bayer,
             ]
@@ -1031,7 +1087,9 @@ impl Gles2Backend {
                 let program = match (batch.program, batch.texture) {
                     (Program::Rect, _) => &self.rect_program,
                     (Program::Text, _) => &self.text_program,
-                    (Program::Image, ImageTexture::Wallpaper) => &self.wallpaper_program,
+                    (Program::Image, ImageTexture::Wallpaper | ImageTexture::WallpaperBlur) => {
+                        &self.wallpaper_program
+                    }
                     (Program::Image, _) => &self.image_program,
                     (Program::Glass, _) => &self.glass_program,
                 };
@@ -1057,11 +1115,19 @@ impl Gles2Backend {
                     Program::Image | Program::Glass => {
                         let texture = match batch.texture {
                             ImageTexture::Icons => self.image.as_ref(),
+                            ImageTexture::Wallpaper if batch.program == Program::Glass => {
+                                self.wallpaper_blur.as_ref().or(self.wallpaper.as_ref())
+                            }
                             ImageTexture::Wallpaper => self.wallpaper.as_ref(),
+                            ImageTexture::WallpaperBlur => {
+                                self.wallpaper_blur.as_ref().or(self.wallpaper.as_ref())
+                            }
                             ImageTexture::WallpaperThumbs => self.wallpaper_thumbs.as_ref(),
                         };
-                        if batch.texture == ImageTexture::Wallpaper
-                            && batch.program == Program::Image
+                        if matches!(
+                            batch.texture,
+                            ImageTexture::Wallpaper | ImageTexture::WallpaperBlur
+                        ) && batch.program == Program::Image
                         {
                             // The dither pattern on unit 1, back to unit 0 for the rest.
                             self.gl.active_texture(glow::TEXTURE1);
@@ -1127,7 +1193,7 @@ fn device_scissor(clip: &Rect, viewport: &Viewport) -> [i32; 4] {
 
 /// The size the wallpaper (16:9) covers in a render buffer: the buffer's width or height, whichever
 /// makes the image reach the whole buffer.
-fn cover_size((width, height): (u32, u32)) -> (u32, u32) {
+pub fn cover_size((width, height): (u32, u32)) -> (u32, u32) {
     if u64::from(width) * 9 >= u64::from(height) * 16 {
         (width, (width * 9).div_ceil(16))
     } else {

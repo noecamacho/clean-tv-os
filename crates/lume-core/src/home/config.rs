@@ -17,8 +17,11 @@ pub const FIRST_USE_FAVORITES: usize = 5;
 pub struct HomeConfig {
     /// Favorite apps, left to right.
     pub favorites: Vec<String>,
-    /// Whether favorite dock icons are rendered as circles instead of rounded squares.
-    pub round_favorites: bool,
+    /// Whether Home shows six smaller banners per row instead of five.
+    pub six_columns: bool,
+    /// Minutes without keys before Home gives the screen to the wallpaper and the time; zero
+    /// turns that off.
+    pub ambient_minutes: u16,
     /// Active wallpaper choice.
     pub wallpaper: WallpaperId,
 }
@@ -38,7 +41,8 @@ impl HomeConfig {
             .collect();
         HomeConfig {
             favorites: installed.into_iter().take(FIRST_USE_FAVORITES).collect(),
-            round_favorites: false,
+            six_columns: false,
+            ambient_minutes: 10,
             wallpaper: WallpaperId::Cinematic,
         }
     }
@@ -97,10 +101,8 @@ impl HomeConfig {
     fn to_kv(&self) -> Kv {
         let mut kv = Kv::new();
         kv.set_list("favorites", self.favorites.iter().map(String::as_str));
-        kv.set(
-            "round_favorites",
-            if self.round_favorites { "1" } else { "0" },
-        );
+        kv.set("six_columns", if self.six_columns { "1" } else { "0" });
+        kv.set("ambient_minutes", &self.ambient_minutes.to_string());
         kv.set("wallpaper", self.wallpaper.as_str());
         kv
     }
@@ -115,15 +117,20 @@ impl HomeConfig {
             }
         }
         favorites.truncate(MAX_FAVORITES);
-        // Round is the default: a file without the key (an older version) gets it too.
-        let round_favorites = kv.get("round_favorites").is_none_or(|value| value == "1");
+        // Five large banners are the default (tvOS calls that size Large; six is its default).
+        let six_columns = kv.get("six_columns") == Some("1");
+        let ambient_minutes = kv
+            .get("ambient_minutes")
+            .and_then(|minutes| minutes.parse().ok())
+            .unwrap_or(10);
         let wallpaper = kv
             .get("wallpaper")
             .and_then(WallpaperId::from_str)
             .unwrap_or(WallpaperId::Aurora);
         Some(HomeConfig {
             favorites,
-            round_favorites,
+            six_columns,
+            ambient_minutes,
             wallpaper,
         })
     }
@@ -181,7 +188,8 @@ mod tests {
     fn sample() -> HomeConfig {
         HomeConfig {
             favorites: vec![NETFLIX.into(), YOUTUBE.into(), SPOTIFY.into()],
-            round_favorites: false,
+            six_columns: false,
+            ambient_minutes: 10,
             wallpaper: WallpaperId::Aurora,
         }
     }
@@ -233,7 +241,8 @@ mod tests {
     fn reordering_favorites() {
         let mut config = HomeConfig {
             favorites: ["a", "b", "c", "spotify", "e"].map(String::from).to_vec(),
-            round_favorites: false,
+            six_columns: false,
+            ambient_minutes: 10,
             wallpaper: WallpaperId::Aurora,
         };
         // Spotify, in position 4 (index 3), moves left.
@@ -250,7 +259,8 @@ mod tests {
     fn adding_and_removing_favorites() {
         let mut config = HomeConfig {
             favorites: vec!["a".into()],
-            round_favorites: false,
+            six_columns: false,
+            ambient_minutes: 10,
             wallpaper: WallpaperId::Aurora,
         };
         assert!(config.add_favorite("chrome"));
@@ -265,7 +275,8 @@ mod tests {
     fn the_favorites_limit_is_twelve() {
         let mut config = HomeConfig {
             favorites: (0..11).map(|i| format!("app{i}")).collect(),
-            round_favorites: false,
+            six_columns: false,
+            ambient_minutes: 10,
             wallpaper: WallpaperId::Aurora,
         };
         assert!(!config.favorites_full());
@@ -304,7 +315,7 @@ mod tests {
         sample().save(&path).unwrap();
         let text = std::fs::read_to_string(&path).unwrap();
         assert!(text.contains("favorites="));
-        assert!(text.contains("round_favorites=0"));
+        assert!(text.contains("six_columns=0"));
         assert!(!text.contains("sections") && !text.contains("carousel"));
     }
 
@@ -312,7 +323,8 @@ mod tests {
     fn an_empty_list_survives_the_round_trip() {
         let config = HomeConfig {
             favorites: vec![],
-            round_favorites: false,
+            six_columns: false,
+            ambient_minutes: 10,
             wallpaper: WallpaperId::Aurora,
         };
         let path = temp("empty");
@@ -321,17 +333,18 @@ mod tests {
     }
 
     #[test]
-    fn round_favorites_round_trips() {
+    fn six_columns_round_trips() {
         let config = HomeConfig {
             favorites: vec![NETFLIX.into()],
-            round_favorites: true,
+            six_columns: true,
+            ambient_minutes: 10,
             wallpaper: WallpaperId::Aurora,
         };
         let path = temp("round-favs-true");
         config.save(&path).unwrap();
         assert_eq!(HomeConfig::load(&path), Some(config));
         let text = std::fs::read_to_string(&path).unwrap();
-        assert!(text.contains("round_favorites=1"));
+        assert!(text.contains("six_columns=1"));
     }
 
     #[test]
@@ -359,8 +372,8 @@ mod tests {
         let config = HomeConfig::load(&path).unwrap();
         assert_eq!(config.favorites, ["c", "b", "a"]);
         assert!(
-            config.round_favorites,
-            "a file without the key gets the default"
+            !config.six_columns,
+            "a file without the key gets the default: five per row"
         );
     }
 
@@ -391,7 +404,8 @@ mod tests {
     fn wallpaper_round_trips() {
         let config = HomeConfig {
             favorites: vec![NETFLIX.into()],
-            round_favorites: false,
+            six_columns: false,
+            ambient_minutes: 10,
             wallpaper: WallpaperId::MirrorLake,
         };
         let path = temp("wallpaper-roundtrip");
@@ -406,7 +420,7 @@ mod tests {
         let path = temp("missing-wallpaper");
         let mut kv = Kv::new();
         kv.set("favorites", "com.netflix.ninja");
-        kv.set("round_favorites", "0");
+        kv.set("six_columns", "0");
         storage::save(&path, 1, &kv).unwrap();
         let config = HomeConfig::load(&path).unwrap();
         assert_eq!(config.wallpaper, WallpaperId::Aurora);
@@ -417,7 +431,7 @@ mod tests {
         let path = temp("invalid-wallpaper");
         let mut kv = Kv::new();
         kv.set("favorites", "com.netflix.ninja");
-        kv.set("round_favorites", "0");
+        kv.set("six_columns", "0");
         kv.set("wallpaper", "non_existent_wallpaper_id");
         storage::save(&path, 1, &kv).unwrap();
         let config = HomeConfig::load(&path).unwrap();

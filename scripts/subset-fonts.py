@@ -73,6 +73,11 @@ ICONS = {
     "contrast": "PICTURE",
     "volume-2": "SOUND",
     "moon": "SLEEP",
+    "power": "POWER",
+    "sun": "SUN",
+    "airplay": "AIRPLAY",
+    "clock": "TIMER",
+    "cast": "CAST",
 }
 
 # Kerning pairs smaller than this many font units (of 1000 per em) are invisible

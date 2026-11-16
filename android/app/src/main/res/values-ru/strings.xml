@@ -20,6 +20,11 @@
     <string name="settings_key_mapping">Настройка пульта</string>
     <string name="settings_tv_info">Информация о ТВ</string>
     <string name="settings_about">О HOME</string>
+    <string name="settings_wallpaper">Обои</string>
+    <string name="settings_tv_section">Настройки ТВ</string>
+    <string name="settings_network">Сеть</string>
+    <string name="settings_home_order">Главный ряд и порядок</string>
+    <string name="settings_all">Все настройки</string>
 
     <!-- Панель состояния ТВ -->
     <string name="stats_title">СОСТОЯНИЕ ТВ</string>
@@ -80,17 +85,17 @@
     <string name="wallpaper_beach_sunset">Закатный пляж</string>
     <string name="wallpaper_beach_dawn">Рассветный пляж</string>
     <string name="wallpaper_aurora">Аврора</string>
-    <string name="wallpaper_mountain_stars">Звёздные горы</string>
-    <string name="wallpaper_misty_forest">Ночной лес</string>
+    <string name="wallpaper_mountain_stars">Горная долина</string>
+    <string name="wallpaper_misty_forest">Туманный лес</string>
     <string name="wallpaper_glass_facade">Стеклянный фасад</string>
-    <string name="wallpaper_synthwave_grid">Сетка синтвейв</string>
-    <string name="wallpaper_mirror_lake">Зеркальное озеро</string>
-    <string name="editor_round_favorites">Круглые значки</string>
+    <string name="wallpaper_synthwave_grid">Гора на закате</string>
+    <string name="wallpaper_mirror_lake">Замок в тумане</string>
+    <string name="editor_six_columns">Шесть значков в ряду</string>
     <string name="editor_breadcrumb_edit">Изменить</string>
     <string name="editor_title">Изменить главный экран</string>
     <string name="editor_done">Готово</string>
     <string name="editor_favorites_order">Избранное</string>
-    <string name="editor_favorites_description">Задайте порядок приложений в доке. Выберите одно и кнопками переместите или удалите его.</string>
+    <string name="editor_favorites_description">Задайте порядок приложений в главном ряду. Выберите одно и кнопками переместите или удалите его.</string>
     <string name="editor_use_arrows">Перемещайте стрелками</string>
     <string name="editor_add_app">Добавить:</string>
     <plurals name="editor_limit_reached">
@@ -193,6 +198,15 @@
     <string name="control_picture">Изображение</string>
     <string name="control_sound">Звук</string>
     <string name="control_ambient">Фоновый режим</string>
+    <string name="control_sleep_now">Сон</string>
+    <string name="control_brightness">Яркость</string>
+    <string name="control_volume">Громкость</string>
+    <string name="control_timer">Таймер сна</string>
+    <string name="control_timer_off">Выкл.</string>
+    <string name="control_on">Вкл.</string>
+    <string name="control_auto">Авто</string>
+    <string name="control_mirror">Дублирование экрана</string>
+    <string name="control_airplay">AirPlay</string>
     <string name="control_apps">Приложения</string>
     <string name="control_settings">Настройки</string>
 </resources>

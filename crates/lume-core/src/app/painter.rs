@@ -45,6 +45,21 @@ impl Painter<'_> {
         dimmed: bool,
         intensity: f32,
     ) {
+        self.wallpaper_veiled(id, dimmed, intensity, None, false);
+    }
+
+    /// [`wallpaper_at`](Self::wallpaper_at) with a veil in the picture itself instead of layers
+    /// over it (each layer is one more pass over every pixel, which the TV's GPU feels): `veil`
+    /// is where the shade starts (canvas y), how much of the picture is kept above it and how
+    /// much at the bottom of the screen.
+    pub fn wallpaper_veiled(
+        &mut self,
+        id: crate::wallpaper::WallpaperId,
+        dimmed: bool,
+        intensity: f32,
+        veil: Option<(f32, f32, f32)>,
+        blurred: bool,
+    ) {
         let keep = if dimmed {
             1.0 - f32::from(TEXT_SCREEN_DIM.a) / 255.0
         } else {
@@ -59,8 +74,48 @@ impl Painter<'_> {
             wallpaper.width as f32 / wallpaper.height as f32,
             visible.w / visible.h,
         );
-        self.list
-            .wallpaper_with_id(visible, uv, fade(Color::WHITE, keep), id);
+        match veil {
+            Some((from, top, bottom)) if from > visible.y && from < visible.bottom() => {
+                let part = (from - visible.y) / visible.h;
+                let above = Rect::new(visible.x, visible.y, visible.w, from - visible.y);
+                let below = Rect::new(visible.x, from, visible.w, visible.bottom() - from);
+                let light = fade(Color::WHITE, keep * top);
+                if blurred {
+                    // The whole picture out of focus, as tvOS does below the fold.
+                    self.list.wallpaper_blur_shaded_with_id(
+                        above,
+                        Rect::new(uv.x, uv.y, uv.w, uv.h * part),
+                        light,
+                        light,
+                        id,
+                    );
+                    self.list.wallpaper_blur_shaded_with_id(
+                        below,
+                        Rect::new(uv.x, uv.y + uv.h * part, uv.w, uv.h * (1.0 - part)),
+                        light,
+                        fade(Color::WHITE, keep * bottom),
+                        id,
+                    );
+                    return;
+                }
+                self.list.wallpaper_with_id(
+                    above,
+                    Rect::new(uv.x, uv.y, uv.w, uv.h * part),
+                    light,
+                    id,
+                );
+                self.list.wallpaper_shaded_with_id(
+                    below,
+                    Rect::new(uv.x, uv.y + uv.h * part, uv.w, uv.h * (1.0 - part)),
+                    light,
+                    fade(Color::WHITE, keep * bottom),
+                    id,
+                );
+            }
+            _ => self
+                .list
+                .wallpaper_with_id(visible, uv, fade(Color::WHITE, keep), id),
+        }
         // The stars are drawn as points of 1 or 2 pixels of the render buffer, over the image, so
         // they stay as sharp as the interface on a 4K screen (which renders at 1080p).
         let pixel = 1.0 / self.display.scale;
@@ -85,13 +140,24 @@ impl Painter<'_> {
         }
     }
 
-    /// Re-samples the wallpaper through a rounded control with a small offset.
-    /// This gives a cheap refractive cue without a full-screen offscreen buffer.
+    /// Glass: the blurred wallpaper behind a rounded control, with a lens and a lit rim (see
+    /// `GLASS_FRAGMENT`).
     pub fn wallpaper_glass(
         &mut self,
         rect: crate::render::Rect,
         radius: f32,
         id: crate::wallpaper::WallpaperId,
+    ) {
+        self.wallpaper_glass_tinted(rect, radius, id, 255);
+    }
+
+    /// Glass darkened to `light` of 255 in its own pass, instead of with a fill over it.
+    pub fn wallpaper_glass_tinted(
+        &mut self,
+        rect: crate::render::Rect,
+        radius: f32,
+        id: crate::wallpaper::WallpaperId,
+        light: u8,
     ) {
         let visible = self.display.visible_rect();
         let wallpaper = id.wallpaper();
@@ -100,8 +166,8 @@ impl Painter<'_> {
             visible.w / visible.h,
         );
         let sample = crate::render::Rect::new(
-            cover.x + (rect.x - visible.x + 4.0) / visible.w * cover.w,
-            cover.y + (rect.y - visible.y - 3.0) / visible.h * cover.h,
+            cover.x + (rect.x - visible.x) / visible.w * cover.w,
+            cover.y + (rect.y - visible.y) / visible.h * cover.h,
             rect.w / visible.w * cover.w,
             rect.h / visible.h * cover.h,
         );
@@ -109,10 +175,10 @@ impl Painter<'_> {
             rect,
             sample,
             Color {
-                r: 255,
-                g: 255,
-                b: 255,
-                a: 145,
+                r: light,
+                g: light,
+                b: light,
+                a: 240,
             },
             radius,
             id,

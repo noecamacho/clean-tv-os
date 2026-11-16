@@ -233,26 +233,22 @@ impl LumeApp {
             .apps()
             .get(id.checked_sub(ids::GRID_BASE)? as usize)?;
         let favorite = self.config.favorites.contains(&app.package);
-        let mut items = vec![if favorite {
-            MenuItem {
-                action: MenuAction::RemoveFromHome,
-                enabled: true,
-            }
-        } else {
-            MenuItem {
-                action: MenuAction::AddToHome,
-                enabled: !self.config.favorites_full(),
-            }
-        }];
-        items.push(MenuItem {
-            action: MenuAction::AppInfo,
+        let item = |action| MenuItem {
+            action,
             enabled: true,
-        });
+        };
+        // tvOS: an action that does not apply is left out, not shown dimmed, and the ones that
+        // take something away come last.
+        let mut items = Vec::new();
+        if !favorite && !self.config.favorites_full() {
+            items.push(item(MenuAction::AddToHome));
+        }
+        items.push(item(MenuAction::AppInfo));
+        if favorite {
+            items.push(item(MenuAction::RemoveFromHome));
+        }
         if !app.system {
-            items.push(MenuItem {
-                action: MenuAction::Uninstall,
-                enabled: true,
-            });
+            items.push(item(MenuAction::Uninstall));
         }
         Some(ContextMenu::new(
             Origin::Grid(id),
@@ -276,8 +272,8 @@ impl LumeApp {
         if count > 1 {
             items.push(item(MenuAction::Move));
         }
-        items.push(item(MenuAction::RemoveFromHome));
         items.push(item(MenuAction::AppInfo));
+        items.push(item(MenuAction::RemoveFromHome));
         Some(ContextMenu::new(Origin::Dock(index), package, items))
     }
 

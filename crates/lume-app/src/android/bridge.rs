@@ -173,6 +173,66 @@ impl Bridge {
             == Some("ok")
     }
 
+    /// Where on the screen (pixels, origin top left) the next app started grows from.
+    pub fn set_launch_rect(&self, [x, y, w, h]: [i32; 4]) {
+        self.call("launch-rect", &format!("{x},{y},{w},{h}"));
+    }
+
+    /// Whether Wi-Fi and Bluetooth are on.
+    pub fn radios(&self) -> Option<(bool, bool)> {
+        let answer = self.call("radios", "")?;
+        let (wifi, bluetooth) = answer.split_once(',')?;
+        Some((wifi == "1", bluetooth == "1"))
+    }
+
+    /// The backlight and the media volume, each from 0 to 100, and whether the TV's light
+    /// sensor drives the backlight (`None` where it has no such sensor).
+    pub fn levels(&self) -> Option<(u8, u8, Option<bool>)> {
+        let answer = self.call("levels", "")?;
+        let mut parts = answer.split(',');
+        let brightness = parts.next()?.parse().ok()?;
+        let volume = parts.next()?.parse().ok()?;
+        let auto = match parts.next() {
+            Some("1") => Some(true),
+            Some("0") => Some(false),
+            _ => None,
+        };
+        Some((brightness, volume, auto))
+    }
+
+    pub fn set_auto_brightness(&self, on: bool) -> bool {
+        self.call("set-light-sensor", if on { "1" } else { "0" })
+            .as_deref()
+            == Some("ok")
+    }
+
+    pub fn set_volume(&self, percent: u8) -> bool {
+        self.call("set-volume", &percent.to_string()).as_deref() == Some("ok")
+    }
+
+    /// False when HOME was not given the "modify system settings" access.
+    pub fn set_brightness(&self, percent: u8) -> bool {
+        self.call("set-brightness", &percent.to_string()).as_deref() == Some("ok")
+    }
+
+    /// Puts the TV to sleep (through the accessibility service of the Home key).
+    pub fn sleep_now(&self) -> bool {
+        self.call("sleep-now", "").as_deref() == Some("ok")
+    }
+
+    /// The focus tick, `pan` from -1.0 (left) to 1.0 (right) at `volume` of 1.0. Java plays it
+    /// only if the TV's system sounds are on.
+    pub fn click(&self, pan: f32, volume: f32) {
+        self.call("click", &format!("{pan:.2},{volume:.2}"));
+    }
+
+    /// Whether the TV has animations off and high-contrast text on.
+    pub fn accessibility(&self) -> Option<(bool, bool)> {
+        let answer = self.call("a11y", "")?;
+        let (motion, contrast) = answer.split_once(',')?;
+        Some((motion == "1", contrast == "1"))
+    }
+
     pub fn open_android_settings(&self) -> bool {
         self.call("settings", "").as_deref() == Some("ok")
     }

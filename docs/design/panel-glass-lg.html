@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel Liquid Glass LG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700&display=swap">
+<style>
+/* Liquid Glass variant of the quick panel (docs/design/panel-rapido-lg.md, «Variante Liquid Glass").
+   Sizes in HOME's 1280x720 units (--u); each .tv is 1920x1080 when the page is 1920 px wide.
+   .frost = over graphics: backdrop blur + edge lens + rim (QML: shared FastBlur + one ShaderEffect).
+   .clear = over video: NO backdrop-filter at all, the compositor cannot sample the video plane. */
+:root {
+  --page: #0b0d12;
+  --text: #e8ebf0;
+  --muted: #9aa3b2;
+  --tile: rgba(246, 248, 252, .94);       /* #f0f6f8fc, focus capsule */
+  --tile-night: rgba(223, 228, 234, .85); /* #d9dfe4ea */
+  --ink: #101620;
+  --soft: rgba(255, 255, 255, .78);       /* #c7ffffff */
+  --track: rgba(255, 255, 255, .27);      /* #46ffffff */
+}
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--page); color: var(--text); font-family: "Plus Jakarta Sans", system-ui, sans-serif; padding: 32px 16px 64px; }
+header, section { max-width: 1920px; margin: 0 auto; }
+header h1 { font-size: 28px; font-weight: 700; }
+header p { color: var(--muted); margin-top: 6px; font-size: 16px; max-width: 980px; line-height: 1.5; }
+section { margin-top: 40px; }
+code { font-size: .92em; }
+
+.tv { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 6px; container-type: inline-size; font-weight: 500; color: #fff; }
+.tv * { --u: calc(100cqw / 1280); }
+.tv .z2, .tv .z2 * { --u: calc(100cqw / 640); } /* the 2x detail */
+
+/* ---------- Backgrounds ---------- */
+.beach { position: absolute; inset: 0; background:
+  radial-gradient(circle at 57% 19%, #fffbea 0 3%, rgba(255, 236, 190, .85) 5%, rgba(255, 200, 150, .25) 14%, transparent 26%),
+  radial-gradient(ellipse 34% 5% at 26% 70%, rgba(255, 255, 255, .7), transparent 70%),
+  radial-gradient(ellipse 30% 4% at 80% 74%, rgba(255, 255, 255, .55), transparent 70%),
+  linear-gradient(180deg, transparent 67%, #f6dcaa 71%, #eec48c 84%, #dda56a 100%),
+  linear-gradient(180deg, #1f7fd0 0%, #5bb6ec 26%, #b9dcef 40%, #ffc79b 47.5%, #3cc6c8 48.5%, #16a7bd 57%, #0b86a8 67%); }
+.palm { position: absolute; left: calc(var(--u) * 40); top: calc(var(--u) * 120); width: calc(var(--u) * 300); height: calc(var(--u) * 360); }
+.tiles { position: absolute; left: calc(var(--u) * 64); top: calc(var(--u) * 470); display: flex; gap: calc(var(--u) * 24); }
+.tiles > div { width: calc(var(--u) * 213); height: calc(var(--u) * 120); border-radius: calc(var(--u) * 16); display: grid; place-items: center; box-shadow: 0 calc(var(--u) * 10) calc(var(--u) * 24) rgba(0, 0, 0, .25); }
+.tiles > div:nth-child(1) { background: linear-gradient(135deg, #ff3b4a, #b0102a); }
+.tiles > div:nth-child(2) { background: linear-gradient(135deg, #ffd54a, #ff8a00); }
+.tiles > div:nth-child(3) { background: linear-gradient(135deg, #2fd27a, #0b8f63); }
+.tiles > div:nth-child(4) { background: linear-gradient(135deg, #4aa3ff, #2a3fd6); }
+.tiles > div:nth-child(5) { background: linear-gradient(135deg, #c46bff, #6a2bd6); }
+.tiles > div:first-child { transform: scale(1.06); box-shadow: 0 0 0 calc(var(--u) * 3) rgba(255, 255, 255, .6), 0 calc(var(--u) * 16) calc(var(--u) * 30) rgba(0, 0, 0, .3); }
+.tiles svg { width: calc(var(--u) * 44); height: calc(var(--u) * 44); }
+.clock { position: absolute; left: calc(var(--u) * 64); top: calc(var(--u) * 40); font-size: calc(var(--u) * 22); font-weight: 700; text-shadow: 0 1px calc(var(--u) * 6) rgba(0, 0, 0, .3); }
+
+/* A cinematic still (dusk, 2.39:1): the sky behind the column is the bright part on purpose. */
+.movie { position: absolute; inset: 0; background:
+  radial-gradient(ellipse 9% 6% at 36% 47%, #fff3d6, rgba(255, 190, 110, .8) 45%, transparent 75%),
+  radial-gradient(ellipse 50% 22% at 36% 52%, rgba(255, 150, 70, .65), transparent 70%),
+  radial-gradient(ellipse 70% 30% at 20% 82%, #120a10, transparent 70%),
+  linear-gradient(172deg, transparent 54%, #2a1622 55%, #150b12 70%, #07050a 100%),
+  linear-gradient(180deg, #2c4a78 0%, #6a7fa6 22%, #c89a94 40%, #f2b27a 50%, #ea8a52 56%); }
+.movie.dim { filter: brightness(.7) saturate(.9); } /* Night mode lowers the OLED light */
+.bars::before, .bars::after { content: ""; position: absolute; left: 0; right: 0; height: calc(var(--u) * 92); background: #000; z-index: 1; }
+.bars::before { top: 0; } .bars::after { bottom: 0; }
+.subtitle { position: absolute; left: 0; right: 0; top: calc(var(--u) * 640); text-align: center; font-size: calc(var(--u) * 26); text-shadow: 0 0 calc(var(--u) * 4) #000; z-index: 2; }
+
+/* ---------- Layout (HomePanel.qml) ---------- */
+.col { position: absolute; left: calc(var(--u) * 770); top: calc(var(--u) * 92); width: calc(var(--u) * 456); display: flex; flex-direction: column; gap: calc(var(--u) * 10); z-index: 3; }
+.row2 { display: flex; gap: calc(var(--u) * 10); }
+svg.i { width: calc(var(--u) * 24); height: calc(var(--u) * 24); fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+svg.s { width: calc(var(--u) * 20); height: calc(var(--u) * 20); }
+svg.m { width: calc(var(--u) * 22); height: calc(var(--u) * 22); }
+
+/* ---------- The material ----------
+   .bd = body (blur + tint + inner shadow), .ln = lens band at the edge, ::after = specular rim.
+   The capsule itself carries no filter/opacity/mask, so .bd and .ln both sample the scene. */
+.glass { position: relative; border-radius: calc(var(--u) * 34.5); }
+.glass > * { position: relative; }
+.glass > .bd, .glass > .ln { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
+.glass::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  padding: calc(var(--u) * 1.3);
+  background: linear-gradient(172deg, rgba(255, 255, 255, .9), rgba(255, 255, 255, .22) 30%, rgba(255, 255, 255, .05) 58%, rgba(255, 255, 255, .38) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+
+/* Frost: over graphics. Tint 44 % (#700c121c), blur 24 u, saturation up like iOS. */
+.frost .glass { box-shadow: 0 calc(var(--u) * 8) calc(var(--u) * 24) rgba(0, 20, 40, .18); }
+.frost .glass > .bd {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .14), rgba(255, 255, 255, 0) 46%), rgba(12, 18, 28, .44);
+  -webkit-backdrop-filter: blur(calc(var(--u) * 24)) saturate(1.7);
+  backdrop-filter: blur(calc(var(--u) * 24)) saturate(1.7);
+  box-shadow: inset 0 calc(var(--u) * -8) calc(var(--u) * 16) rgba(0, 0, 0, .22), inset 0 calc(var(--u) * 2) calc(var(--u) * 4) rgba(255, 255, 255, .16); }
+/* Lens: a soft edge band, less blurred, brighter and more saturated, as light bunching at a curved edge. */
+.frost .glass > .ln {
+  -webkit-backdrop-filter: blur(calc(var(--u) * 4)) saturate(2.2) brightness(1.28);
+  backdrop-filter: blur(calc(var(--u) * 4)) saturate(2.2) brightness(1.28);
+  -webkit-mask: linear-gradient(180deg, #000, transparent 26%, transparent 76%, rgba(0, 0, 0, .7)), linear-gradient(90deg, #000, transparent 8%, transparent 92%, #000);
+  mask: linear-gradient(180deg, #000, transparent 26%, transparent 76%, rgba(0, 0, 0, .7)), linear-gradient(90deg, #000, transparent 8%, transparent 92%, #000);
+  opacity: .85; }
+
+/* Clear: over video. No backdrop-filter. Denser tint, top sheen, edge glow, depth shadow. */
+.clear .glass { box-shadow: 0 calc(var(--u) * 10) calc(var(--u) * 28) rgba(0, 0, 0, .34), 0 calc(var(--u) * 2) calc(var(--u) * 6) rgba(0, 0, 0, .22); }
+.clear .glass > .bd {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .13), rgba(255, 255, 255, .02) 42%, rgba(255, 255, 255, 0) 60%, rgba(255, 255, 255, .05)),
+    linear-gradient(180deg, rgba(20, 26, 38, .70), rgba(9, 12, 20, .80));
+  box-shadow: inset 0 0 calc(var(--u) * 12) rgba(255, 255, 255, .07), inset 0 calc(var(--u) * -8) calc(var(--u) * 16) rgba(0, 0, 0, .28), inset 0 calc(var(--u) * 2) calc(var(--u) * 3) rgba(255, 255, 255, .14); }
+.clear .glass > .ln { display: none; }
+.night .glass::after { opacity: .55; } /* rim dims with Night mode */
+
+/* Focus: white capsule, 3 u halo, 1.03. The slider glass never turns white: its level does. */
+.focus { transform: scale(1.03); z-index: 1; }
+.tv .glass.focus { box-shadow: 0 0 0 calc(var(--u) * 3) rgba(255, 255, 255, .35), 0 calc(var(--u) * 10) calc(var(--u) * 28) rgba(0, 0, 0, .3); }
+.tile.focus > .bd { background: var(--tile) !important; box-shadow: inset 0 calc(var(--u) * -6) calc(var(--u) * 12) rgba(16, 22, 32, .10); }
+.night .tile.focus > .bd { background: var(--tile-night) !important; }
+.tile.focus > .ln { display: none; }
+.tile.focus { color: var(--ink); }
+
+/* "Ahora" card (PanelFormats.qml). */
+.card { height: calc(var(--u) * 112); border-radius: calc(var(--u) * 34); padding: 0 calc(var(--u) * 20); display: flex; flex-direction: column; justify-content: center; gap: calc(var(--u) * 14); }
+.card .line { display: flex; align-items: center; gap: calc(var(--u) * 6); height: calc(var(--u) * 30); }
+.card .line svg { margin-right: calc(var(--u) * 12); }
+.badge { height: calc(var(--u) * 24); padding: 0 calc(var(--u) * 8); border-radius: calc(var(--u) * 6); border: 1.5px solid rgba(255, 255, 255, .7); display: inline-flex; align-items: center; font-weight: 700; font-size: calc(var(--u) * 12); letter-spacing: calc(var(--u) * .6); }
+.badge.prem { background: var(--tile); color: var(--ink); border-color: transparent; }
+.dash { color: rgba(255, 255, 255, .5); font-size: calc(var(--u) * 15); }
+.side { margin-left: auto; color: rgba(255, 255, 255, .7); font-size: calc(var(--u) * 15); }
+
+/* Slider (PanelSlider.qml + SliderLabels.qml). */
+.pill { height: calc(var(--u) * 69); }
+.labels { position: absolute !important; top: 0; left: 0; height: calc(var(--u) * 69); width: calc(var(--u) * 456); font-size: calc(var(--u) * 19); }
+.labels svg { position: absolute; left: calc(var(--u) * 22); top: calc(var(--u) * 22.5); }
+.labels .l { position: absolute; left: calc(var(--u) * 58); line-height: calc(var(--u) * 69); }
+.labels .v { position: absolute; right: calc(var(--u) * 20); line-height: calc(var(--u) * 69); }
+.fill { position: absolute !important; top: 0; left: 0; height: 100%; width: calc(var(--lvl) * 1%); overflow: hidden; border-radius: calc(var(--u) * 34.5) 0 0 calc(var(--u) * 34.5); }
+.fill .lvl { position: absolute; inset: 0 auto 0 0; width: calc(var(--u) * 456); border-radius: calc(var(--u) * 34.5); background: var(--track); }
+.focus .fill .lvl { background: var(--tile); }
+.night .focus .fill .lvl { background: var(--tile-night); }
+.focus .fill .labels { color: var(--ink); }
+
+/* Button (PanelButton.qml): disc at 12 u, label at 66 u. */
+.tile.btn { display: flex; align-items: center; padding-left: calc(var(--u) * 12); }
+.half { flex: 1; }
+.disc { width: calc(var(--u) * 44); height: calc(var(--u) * 44); border-radius: 50%; background: rgba(255, 255, 255, .15); display: grid; place-items: center; flex: none; margin-right: calc(var(--u) * 10); }
+.txt { display: flex; flex-direction: column; line-height: 1.22; min-width: 0; }
+.txt b { font-weight: 500; font-size: calc(var(--u) * 17); white-space: nowrap; }
+.txt small { font-size: calc(var(--u) * 15); color: var(--soft); white-space: nowrap; }
+.on .disc { background: var(--tile); color: var(--ink); }
+.tile.focus small { color: rgba(16, 22, 32, .70); }
+.tile.focus .disc { background: rgba(16, 22, 32, .10); }
+.tile.focus.on .disc { background: var(--ink); color: #fff; }
+
+/* Choice (PanelChoice.qml): glyph, name, ‹ value › and dots. */
+.choice .l { position: absolute; left: calc(var(--u) * 58); line-height: calc(var(--u) * 69); font-size: calc(var(--u) * 19); }
+.choice > svg.i { position: absolute; left: calc(var(--u) * 22); top: calc(var(--u) * 22.5); }
+.pick { position: absolute !important; right: calc(var(--u) * 12); top: calc(var(--u) * 17); display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 5); }
+.pick .r { display: flex; align-items: center; gap: calc(var(--u) * 6); height: calc(var(--u) * 26); font-size: calc(var(--u) * 19); }
+.pick .r svg { opacity: .8; } .pick .r svg.end { opacity: .3; }
+.dots { display: flex; gap: calc(var(--u) * 4); }
+.dots i { width: calc(var(--u) * 4); height: calc(var(--u) * 4); border-radius: calc(var(--u) * 2); background: currentColor; opacity: .35; }
+.dots i.cur { width: calc(var(--u) * 10); opacity: .9; }
+
+/* ---------- 2x detail ---------- */
+.pane { position: absolute; top: 0; bottom: 0; width: 50%; overflow: hidden; }
+.pane.r { left: 50%; }
+
+.pane .tiles { top: calc(100cqw / 1280 * 300); left: calc(100cqw / 1280 * -40); }
+.z2 .tile { position: absolute; left: calc(var(--u) * 48.5); top: calc(var(--u) * 66); width: calc(var(--u) * 223); }
+.z2 .tile.b { top: calc(var(--u) * 146); }
+.notes { position: absolute; left: calc(100cqw / 1280 * 64); right: calc(100cqw / 1280 * 40); top: calc(100cqw / 1280 * 470); z-index: 4; font-size: calc(100cqw / 1280 * 15); line-height: 1.55; background: rgba(0, 0, 0, .55); border-radius: calc(100cqw / 1280 * 14); padding: calc(100cqw / 1280 * 14) calc(100cqw / 1280 * 18); }
+.notes b { font-weight: 700; display: block; font-size: calc(100cqw / 1280 * 18); margin-bottom: calc(100cqw / 1280 * 4); }
+.tag { position: absolute; z-index: 4; font-size: calc(100cqw / 1280 * 13); font-weight: 700; padding: calc(100cqw / 1280 * 3) calc(100cqw / 1280 * 9); border-radius: 99px; background: rgba(0, 0, 0, .6); top: calc(100cqw / 1280 * 24); left: calc(100cqw / 1280 * 24); letter-spacing: .04em; }
+
+/* Legends. */
+.legend { margin-top: 14px; display: grid; gap: 8px; max-width: 1100px; }
+.legend h2 { font-size: 20px; font-weight: 700; }
+.legend p { color: var(--muted); font-size: 15px; line-height: 1.55; }
+.legend kbd { font-family: inherit; font-size: 13px; padding: 1px 7px; border: 1px solid #3a4250; border-radius: 6px; color: var(--text); background: #161a22; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+  <symbol id="moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+  <symbol id="vol" viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></symbol>
+  <symbol id="tv" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="m17 2-5 5-5-5"/></symbol>
+  <symbol id="speaker" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><circle cx="12" cy="14" r="4"/><path d="M12 6h.01"/></symbol>
+  <symbol id="screenoff" viewBox="0 0 24 24"><path d="M17 17H4a2 2 0 0 1-2-2V5c0-1.5 1-2 1-2M22 15V5a2 2 0 0 0-2-2H9M8 21h8M12 17v4M2 2l20 20"/></symbol>
+  <symbol id="sliders" viewBox="0 0 24 24"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></symbol>
+  <symbol id="cl" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="cr" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="film" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 3v18M17 3v18M3 7.5h4M3 12h18M3 16.5h4M17 7.5h4M17 16.5h4"/></symbol>
+  <symbol id="music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+  <symbol id="image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></symbol>
+  <symbol id="play" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m10 8 6 4-6 4V8Z"/></symbol>
+  <symbol id="radio" viewBox="0 0 24 24"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5M19.1 4.9C23 8.8 23 15.1 19.1 19"/><circle cx="12" cy="12" r="2"/></symbol>
+</svg>
+
+<header>
+  <h1>Panel rápido · variante Liquid Glass</h1>
+  <p>Exploración para la LG OLED55C1 (<code>docs/design/panel-rapido-lg.md</code>, «Variante Liquid Glass»). Misma columna, mismas filas y mismo foco que el panel actual; solo cambia el material. Sobre gráficos hay vidrio de verdad (desenfoque de lo que hay detrás). Sobre una película no: el vídeo va en un plano de hardware que el compositor no puede leer, así que el estado b no usa <code>backdrop-filter</code>. Cada marco es 1920×1080 a 1920 px de ancho.</p>
+</header>
+
+<!-- a · Over HOME: frost -->
+<section>
+  <div class="tv frost">
+    <div class="beach"></div>
+    <svg class="palm" viewBox="0 0 300 360" aria-hidden="true"><path d="M160 360 C150 260 150 190 172 110" stroke="#2b3a2a" stroke-width="10" fill="none"/><path d="M172 110 C120 80 70 90 20 140 C80 110 130 110 172 115 Z M172 110 C210 60 260 50 300 70 C250 75 210 95 175 118 Z M172 110 C150 50 110 20 60 20 C110 40 140 70 168 115 Z M172 110 C230 110 270 140 290 190 C250 150 210 130 172 118 Z M172 110 C130 130 100 170 90 230 C115 180 140 145 172 118 Z" fill="#1f4a32"/></svg>
+    <div class="clock">HOME</div>
+    <div class="tiles">
+      <div><svg class="i"><use href="#film"/></svg></div>
+      <div><svg class="i"><use href="#music"/></svg></div>
+      <div><svg class="i"><use href="#image"/></svg></div>
+      <div><svg class="i"><use href="#play"/></svg></div>
+      <div><svg class="i"><use href="#radio"/></svg></div>
+    </div>
+    <div class="col">
+      <div class="glass card"><i class="bd"></i><i class="ln"></i>
+        <div class="line"><svg class="i s"><use href="#tv"/></svg><span class="dash">—</span></div>
+        <div class="line"><svg class="i s"><use href="#speaker"/></svg><span class="badge">PCM</span><span class="badge">2.0</span><span class="side">Sonos Arc</span></div>
+      </div>
+      <div class="glass pill focus" style="--lvl:70"><i class="bd"></i><i class="ln"></i>
+        <div class="labels"><svg class="i"><use href="#sun"/></svg><span class="l">Brillo</span><span class="v">70 %</span></div>
+        <div class="fill"><div class="lvl"></div><div class="labels"><svg class="i"><use href="#sun"/></svg><span class="l">Brillo</span><span class="v">70 %</span></div></div>
+      </div>
+      <div class="glass pill tile btn"><i class="bd"></i><i class="ln"></i><span class="disc"><svg class="i m"><use href="#moon"/></svg></span><span class="txt"><b>Modo noche</b><small>Desactivado</small></span></div>
+      <div class="glass pill" style="--lvl:24"><i class="bd"></i><i class="ln"></i>
+        <div class="labels"><svg class="i"><use href="#vol"/></svg><span class="l">Volumen</span><span class="v">24 %</span></div>
+        <div class="fill"><div class="lvl"></div><div class="labels"><svg class="i"><use href="#vol"/></svg><span class="l">Volumen</span><span class="v">24 %</span></div></div>
+      </div>
+      <div class="glass pill choice"><i class="bd"></i><i class="ln"></i><svg class="i"><use href="#tv"/></svg><span class="l">Modo de imagen</span>
+        <div class="pick"><div class="r"><svg class="i s"><use href="#cl"/></svg>Estándar<svg class="i s"><use href="#cr"/></svg></div><div class="dots" aria-label="Estándar, 2 de 9"><i></i><i class="cur"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+      </div>
+      <div class="row2">
+        <div class="glass pill tile btn half"><i class="bd"></i><i class="ln"></i><span class="disc"><svg class="i m"><use href="#screenoff"/></svg></span><span class="txt"><b>Apagar pantalla</b></span></div>
+        <div class="glass pill tile btn half"><i class="bd"></i><i class="ln"></i><span class="disc"><svg class="i m"><use href="#sliders"/></svg></span><span class="txt"><b>Más ajustes</b></span></div>
+      </div>
+    </div>
+  </div>
+  <div class="legend">
+    <h2>a · Sobre HOME: vidrio esmerilado de verdad</h2>
+    <p>Aquí todo lo de detrás son gráficos, así que el compositor puede copiarlo. Al abrir con <kbd>⚙</kbd> se toma una foto de la zona de la columna a media resolución, se desenfoca una vez (24 u, saturación ×1,7) y cada cápsula la usa recortada a su forma. Encima van un tinte oscuro de solo el 44 %, una banda de lente en el borde (el fondo, menos desenfocado y más vivo, se «amontona» en la curva), un filo especular más fuerte arriba y una sombra interior abajo. La playa, el sol y las fichas de colores se adivinan a través del panel. El foco no cambia: cápsula blanca, halo de 3 u y escala 1,03, y en el deslizador se vuelve blanco el nivel, no la cápsula. No hay velada lateral. Sin nada reproduciéndose, la fila de imagen de «Ahora» muestra una raya.</p>
+  </div>
+</section>
+
+<!-- b · Over a movie: clear glass, no backdrop -->
+<section>
+  <div class="tv clear">
+    <div class="movie bars"></div>
+    <div class="subtitle">— Si salimos ahora, llegamos antes de que anochezca.</div>
+    <div class="col">
+      <div class="glass card"><i class="bd"></i>
+        <div class="line"><svg class="i s"><use href="#tv"/></svg><span class="badge prem">DOLBY VISION</span><span class="badge">4K</span><span class="badge">24p</span></div>
+        <div class="line"><svg class="i s"><use href="#speaker"/></svg><span class="badge prem">DOLBY ATMOS</span><span class="side">Sonos Arc</span></div>
+      </div>
+      <div class="glass pill" style="--lvl:70"><i class="bd"></i>
+        <div class="labels"><svg class="i"><use href="#sun"/></svg><span class="l">Brillo</span><span class="v">70 %</span></div>
+        <div class="fill"><div class="lvl"></div><div class="labels"><svg class="i"><use href="#sun"/></svg><span class="l">Brillo</span><span class="v">70 %</span></div></div>
+      </div>
+      <div class="glass pill tile btn focus"><i class="bd"></i><span class="disc"><svg class="i m"><use href="#moon"/></svg></span><span class="txt"><b>Modo noche</b><small>Desactivado</small></span></div>
+      <div class="glass pill" style="--lvl:24"><i class="bd"></i>
+        <div class="labels"><svg class="i"><use href="#vol"/></svg><span class="l">Volumen</span><span class="v">24 %</span></div>
+        <div class="fill"><div class="lvl"></div><div class="labels"><svg class="i"><use href="#vol"/></svg><span class="l">Volumen</span><span class="v">24 %</span></div></div>
+      </div>
+      <div class="glass pill choice"><i class="bd"></i><svg class="i"><use href="#tv"/></svg><span class="l">Modo de imagen</span>
+        <div class="pick"><div class="r"><svg class="i s"><use href="#cl"/></svg>Cine<svg class="i s"><use href="#cr"/></svg></div><div class="dots" aria-label="Cine, 3 de 6"><i></i><i></i><i class="cur"></i><i></i><i></i><i></i></div></div>
+      </div>
+      <div class="row2">
+        <div class="glass pill tile btn half"><i class="bd"></i><span class="disc"><svg class="i m"><use href="#screenoff"/></svg></span><span class="txt"><b>Apagar pantalla</b></span></div>
+        <div class="glass pill tile btn half"><i class="bd"></i><span class="disc"><svg class="i m"><use href="#sliders"/></svg></span><span class="txt"><b>Más ajustes</b></span></div>
+      </div>
+    </div>
+  </div>
+  <div class="legend">
+    <h2>b · Sobre una película: vidrio claro, sin desenfoque</h2>
+    <p>El vídeo va en un plano de hardware por debajo de los gráficos. La escena GL es transparente ahí, así que una copia desenfocada saldría vacía: aquí no hay desenfoque y no se finge. El vidrio es un tinte de arriba abajo (70 → 80 %, como el 78 % actual de media) para que el texto aguante sobre un cielo claro. Lo que lo hace parecer vidrio es la luz: un brillo suave en la mitad de arriba, un filo especular que nace arriba y vuelve tenue abajo, un resplandor interior en los bordes, una sombra interior abajo y una sombra de profundidad que separa cada cápsula de la imagen. Es la misma receta que en (a) con el desenfoque apagado. El foco está en <b>Modo noche</b>: cápsula blanca, disco en tinta al 10 %.</p>
+  </div>
+</section>
+
+<!-- c · Same, Night mode on, focus on brightness -->
+<section>
+  <div class="tv clear night">
+    <div class="movie dim bars"></div>
+    <div class="subtitle">— Si salimos ahora, llegamos antes de que anochezca.</div>
+    <div class="col">
+      <div class="glass card"><i class="bd"></i>
+        <div class="line"><svg class="i s"><use href="#tv"/></svg><span class="badge prem">DOLBY VISION</span><span class="badge">4K</span><span class="badge">24p</span></div>
+        <div class="line"><svg class="i s"><use href="#speaker"/></svg><span class="badge prem">DOLBY ATMOS</span><span class="side">Sonos Arc</span></div>
+      </div>
+      <div class="glass pill focus" style="--lvl:40"><i class="bd"></i>
+        <div class="labels"><svg class="i"><use href="#sun"/></svg><span class="l">Brillo</span><span class="v">Noche · 40 %</span></div>
+        <div class="fill"><div class="lvl"></div><div class="labels"><svg class="i"><use href="#sun"/></svg><span class="l">Brillo</span><span class="v">Noche · 40 %</span></div></div>
+      </div>
+      <div class="glass pill tile btn on"><i class="bd"></i><span class="disc"><svg class="i m"><use href="#moon"/></svg></span><span class="txt"><b>Modo noche</b><small>Activado</small></span></div>
+      <div class="glass pill" style="--lvl:24"><i class="bd"></i>
+        <div class="labels"><svg class="i"><use href="#vol"/></svg><span class="l">Volumen</span><span class="v">24 %</span></div>
+        <div class="fill"><div class="lvl"></div><div class="labels"><svg class="i"><use href="#vol"/></svg><span class="l">Volumen</span><span class="v">24 %</span></div></div>
+      </div>
+      <div class="glass pill choice"><i class="bd"></i><svg class="i"><use href="#tv"/></svg><span class="l">Modo de imagen</span>
+        <div class="pick"><div class="r"><svg class="i s"><use href="#cl"/></svg>Cine<svg class="i s"><use href="#cr"/></svg></div><div class="dots" aria-label="Cine, 3 de 6"><i></i><i></i><i class="cur"></i><i></i><i></i><i></i></div></div>
+      </div>
+      <div class="row2">
+        <div class="glass pill tile btn half"><i class="bd"></i><span class="disc"><svg class="i m"><use href="#screenoff"/></svg></span><span class="txt"><b>Apagar pantalla</b></span></div>
+        <div class="glass pill tile btn half"><i class="bd"></i><span class="disc"><svg class="i m"><use href="#sliders"/></svg></span><span class="txt"><b>Más ajustes</b></span></div>
+      </div>
+    </div>
+  </div>
+  <div class="legend">
+    <h2>c · Modo noche activado, foco en Brillo</h2>
+    <p>La imagen se ve más apagada porque el modo noche baja la luz OLED. El panel baja con ella: el filo especular queda al 55 % y el nivel enfocado usa el blanco de noche (<code>#d9dfe4ea</code>, 85 %), para que nada deslumbre en una sala a oscuras. El valor dice «Noche · 40 %» y <kbd>←</kbd> <kbd>→</kbd> ajustan el nivel de noche sin salir del modo. <b>Modo noche</b> ya no tiene el foco y muestra que está encendido con el disco blanco, la luna en tinta y «Activado»: el blanco de la cápsula sigue siendo solo para el foco. El tinte no cambia, porque la película puede volver a ponerse clara.</p>
+  </div>
+</section>
+
+<!-- d · 2x detail -->
+<section>
+  <div class="tv">
+    <div class="pane frost">
+      <div class="beach" style="background-size: 400% 200%; background-position: 56% 25%;"></div>
+      <div class="tiles" style="transform: scale(1.4);">
+        <div><svg class="i"><use href="#film"/></svg></div>
+        <div><svg class="i"><use href="#music"/></svg></div>
+        <div><svg class="i"><use href="#image"/></svg></div>
+      </div>
+      <span class="tag">SOBRE GRÁFICOS · ×2</span>
+      <div class="z2">
+        <div class="glass pill tile btn half"><i class="bd"></i><i class="ln"></i><span class="disc"><svg class="i m"><use href="#screenoff"/></svg></span><span class="txt"><b>Apagar pantalla</b></span></div>
+        <div class="glass pill tile btn half b on"><i class="bd"></i><i class="ln"></i><span class="disc"><svg class="i m"><use href="#moon"/></svg></span><span class="txt"><b>Modo noche</b><small>Activado</small></span></div>
+      </div>
+      <div class="notes"><b>Esmerilado</b>1 · desenfoque de lo de detrás (copia a media resolución, 1 vez por segundo) · 2 · tinte 44 % · 3 · banda de lente en el borde · 4 · filo especular, fuerte arriba · 5 · sombra interior abajo</div>
+    </div>
+    <div class="pane r clear">
+      <div class="movie" style="background-size: 400% 200%; background-position: 38% 45%;"></div>
+      <span class="tag">SOBRE VÍDEO · ×2</span>
+      <div class="z2">
+        <div class="glass pill tile btn half"><i class="bd"></i><span class="disc"><svg class="i m"><use href="#screenoff"/></svg></span><span class="txt"><b>Apagar pantalla</b></span></div>
+        <div class="glass pill tile btn half b on"><i class="bd"></i><span class="disc"><svg class="i m"><use href="#moon"/></svg></span><span class="txt"><b>Modo noche</b><small>Activado</small></span></div>
+      </div>
+      <div class="notes"><b>Claro</b>1 · sin desenfoque: el plano de vídeo no se puede leer · 2 · tinte 70 → 80 % · 3 · brillo en la mitad de arriba · 4 · filo especular y resplandor de borde · 5 · sombra interior y de profundidad</div>
+    </div>
+  </div>
+  <div class="legend">
+    <h2>d · Detalle ×2: el mismo botón en los dos materiales</h2>
+    <p>A la izquierda, sobre gráficos: el color de la playa pasa a través de la cápsula y se aviva en el borde, donde la lente lo concentra. A la derecha, sobre vídeo: la película no atraviesa el vidrio, y la sensación de material sale solo del filo de luz, del brillo de arriba y de las sombras. Las dos cápsulas usan el mismo sombreador; la única diferencia es si recibe la textura desenfocada o no. Abajo, el botón encendido muestra que «encendido» es el disco relleno en los dos materiales, nunca la cápsula blanca.</p>
+  </div>
+</section>
+
+</body>
+</html>

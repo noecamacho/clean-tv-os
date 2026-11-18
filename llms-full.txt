@@ -1100,6 +1100,7 @@ La tele pidió aceptar el emparejamiento, cargó el exploit en `com.webos.app.ad
 Estado que devuelve `luna://org.webosbrew.hbchannel.service/getConfiguration`: `root: true`, `sshdEnabled: true`, `blockUpdates: true`, `telnetDisabled: true`.
 
 - **Entrar:** `ssh -i ~/.ssh/oled_root -o IdentitiesOnly=yes root@192.168.0.185`. La clave pública está en `/home/root/.ssh/authorized_keys` de la tele. Copiar archivos: `scp -O` (es dropbear; la subida por Wi-Fi es lenta, unos 8 MB por minuto).
+- **Desde el PC** (2026-11-17) también entra la clave `~/.ssh/id_ed25519`, añadida a `authorized_keys` desde el Mac; la clave `oled_root` sigue solo en el Mac.
 - **`luna-send` por SSH necesita terminal:** sin `ssh -tt` no imprime nada. Usa `luna-send -w 4000 -n 1 -f <uri> '<json>'`.
 - **Telnet sin contraseña cerrado** (`/var/luna/preferences/webosbrew_telnet_disabled`). Si el arranque de Homebrew Channel falla dos veces entra en modo a prueba de fallos y lo vuelve a abrir.
 - **No instalar la app Developer Mode de LG** con la tele rooteada, y **no actualizar el firmware**: Homebrew Channel bloquea las actualizaciones, pero conviene dejar también desactivada la automática en Ajustes → Soporte.
@@ -1144,7 +1145,334 @@ Estado en la tele el 2026-11-16 (versión 0.1.0, comprobado con captura): arranc
 - La hora se corta en la cápsula («10:02…»).
 - Sin empezar: entradas HDMI en Inicio, fondos de Luma, saludo con fecha, Centro de control para LG.
 
+**Versión 0.1.1 (2026-11-17, comprobado con captura y con `home.log`).** Defectos corregidos y su causa:
+
+- **Fondo negro.** El paquete no llevaba los fondos. `scripts/webos-build.sh` copia ahora `crates/lume-core/assets/wallpaper/*` (19 QOI, 28 MB) a `assets/wallpaper` del ipk. El fondo se descodifica en 144 ms la primera vez y en 10–36 ms desde la caché.
+- **Apps sin icono.** HOME corre enjaulado (uid 6715) y no ve `/usr/palm/applications` ni `/media/cryptofs/apps`, solo `/media/developer/apps`. `Bridge::mirror_unreadable_icons` escribe una lista en `/media/developer/app.home.tv/icons/wanted.txt`, y una sola llamada a `luna://org.webosbrew.hbchannel.service/exec` copia como root los iconos a esa carpeta, que la jaula sí ve. La primera vez fueron 35 iconos en 1,3 s; después solo se copian los nuevos.
+- **Centro de control congelado.** Tres causas:
+  1. Cada llamada Luna registraba y desregistraba una conexión al bus. Ahora hay una conexión por hilo, que se descarta si una llamada caduca.
+  2. Los niveles se leían en el bucle de dibujo cada 300 ms. Ahora los lee y escribe el hilo `levels` (`src/levels.rs`), y las órdenes del deslizador se agrupan para enviar solo la última.
+  3. El audio no responde a HOME: `master/getVolume` devuelve `"Message status unknown"` o caduca a los 6,5 s. webOS da a una app de desarrollo solo el grupo ACG `public` (`/var/luna-service2-dev/client-permissions.d/app.home.tv.app.json`) aunque `requiredACG` pida más. El volumen se lee y se cambia como root con `luna-send` a través del `exec` de Homebrew Channel (`call_as_root`), en unos 110 ms. El resto de llamadas de HOME sí son públicas (apps, ajustes, `backlight`, red, Bluetooth, `turnOffScreen`, información del sistema).
+- **Primer fotograma:** 0,57 s; antes, 7 s.
+- **Wi-Fi y Bluetooth del Centro de control** abren los ajustes de LG con `params.target`: `ExternalDevice` para Bluetooth y `network` para Wi-Fi.
+- **Registro:** `/media/developer/app.home.tv/home.log`, nuevo en cada arranque. SAM manda el stderr de las apps nativas a `/dev/null`.
+
+**Incidente:** el 2026-11-17 a las 21:01 `audiod` murió por `SIGABRT` y systemd no lo reinició (`audiod.service` en `failed`). Mientras estuvo caído, ninguna llamada de audio respondía, ni siquiera como root. Se arrancó de nuevo con `systemctl start audiod.service`. Un chorro de 30 `setVolume` simultáneos no lo reprodujo, así que **la causa no se conoce**. Si el volumen deja de responder, mira `systemctl is-active audiod.service`.
+
+**`scripts/lg-key.sh` dejó de funcionar** el 2026-11-17: el socket de `networkinput` acepta la conexión y la cierra sin entregar la tecla, ni siquiera `HOME`, con los servicios del gancho de arranque parados o en marcha. Las pruebas de mando quedan en manos del usuario con el mando físico.
+
+Compilar en un PC Linux x86_64: el NDK es `openlgtv/buildroot-nc4` `webos-d7ed7ee` (`arm-webos-linux-gnueabi_sdk-buildroot.tar.gz`, misma versión que el de webosbrew); la imagen base se construye con `docker build --target toolchain -t lume-toolchain:latest -f docker/Dockerfile .`, y `ares-package` se ejecuta con `npx` si no está instalado (el script ya hace las dos cosas). Para probar cambios sin reinstalar: cierra la app (`closeByAppId`), espera a que no haya proceso `home`, copia `dist/webos/home` encima del binario instalado y relanza.
+
 Se quedó así porque el agente que hacía el port lo detuvieron los filtros de seguridad del modelo mientras probaba pulsaciones de mando por un método de bajo nivel. Para probar, usa `scripts/lg-key.sh` y la captura de arriba; no hace falta nada más bajo. El Home de LG sigue siendo el Home (sin montaje ni ganchos de arranque) y Luma sigue instalado.
+
+## API del bus Luna comprobada con root (2026-11-17) [comprobado]
+
+Probado por SSH como root con `luna-send -w 4000 -n 1 -f`. Cada escritura se hizo con el valor actual o con ida y vuelta, y se leyó de nuevo; la tele quedó como estaba. Hay 138 servicios en `/usr/share/luna-service2/services.d/`.
+
+| Función | Llamada | Resultado |
+| --- | --- | --- |
+| Entradas y su estado | `com.webos.service.eim/getAllInputStatus {}` | Comprobado: `devices[]` con `id` (`HDMI_1`…), `label`, `appId` (`com.webos.app.hdmi1`…), `connected`, `activate`, dispositivos CEC en `subList` y `arcDevice` |
+| Cambiar de entrada | `applicationManager/launch {"id":"com.webos.app.hdmiN"}` | Comprobado que existen `hdmi1`–`hdmi4` en `listApps`; abrirlas es el mismo `launch` ya probado |
+| Volumen exacto | `com.webos.service.audio/master/getVolume` y `setVolume {"volume":N}` | Comprobado: `volume`, `maxVolume` 100, `muteStatus`, `soundOutput` |
+| Salida de sonido | `com.webos.service.apiadapter/audio/getSoundOutput` y `changeSoundOutput {"output":…}` | Comprobado (hoy `external_arc`) |
+| Brillo OLED | `settingsservice` categoría `picture`, clave `backlight` (0–100) | Comprobado. `oledLight` **no existe** en esta tele (`errorKey`); el brillo OLED se llama `backlight` |
+| Modo de imagen | `picture` / `pictureMode` | Comprobado lectura y escritura (`vivid`) |
+| Modo de sonido | `sound` / `soundMode` | Comprobado lectura y escritura (`aiSoundPlus`, `standard`…) |
+| Temporizador de apagado | `time` / `sleepTimer` | Comprobado (`off`) |
+| Apagar y encender la pantalla | `com.webos.service.tvpower/power/turnOffScreen` y `turnOnScreen` | Comprobado: el estado pasa a `Screen Off` y vuelve a `Active` |
+| Estado de energía | `tvpower/power/getPowerState` | Comprobado |
+| Bluetooth | `com.webos.service.bluetooth2/adapter/getStatus` | Comprobado: `powered`, `discovering`, nombre. Cambiar redes o emparejar sigue fuera del diseño |
+| Estado de la red | `com.webos.service.connectionmanager/getStatus` | Comprobado: `isInternetConnectionAvailable`, estado de Wi-Fi y cable |
+| Recientes | `com.webos.service.recent/listRecents` | Comprobado: `recentsAppList[]` con `appId`, `title`, `splashBackground` |
+| Cerrar una app | `applicationManager/closeByAppId {"id":…}` | Comprobado con `app.home.tv`: se cierra y sale de `running` |
+| App en primer plano y residentes | `getForegroundAppInfo`, `running` | Comprobado |
+| Aviso del sistema | `com.webos.notification/createToast {"sourceId":…,"message":…}` | Comprobado: devuelve `toastId` |
+| Desinstalar | `com.webos.appInstallService/remove {"id":…}` | Existe y responde (`returnValue: true` con un id inexistente); no se desinstaló nada real |
+| Gancho de arranque | `/var/lib/webosbrew/init.d/` | Comprobado (2026-11-17): un script ejecutable de prueba corrió en el arranque, unos 7 s antes de que SSH aceptara conexiones; después se borró y la carpeta quedó vacía |
+| Apagar la tele | `tvpower/power/shutDown {"reason":"remoteKey"}` | Comprobado: la tele se apaga como con el mando. `power/turnOff` **no existe** (`Unknown method`). Al encenderla con el mando arrancó en frío (`getPowerOnReason` → `remoteKey`) aunque Quick Start+ estaba activo; SSH tarda unos 15 s más |
+
+Figma (`HOME OS · LG webOS`) recoge estas insignias en la página 04 y en las notas de cada pantalla; la pantalla nueva es **08.10 · Rendimiento**, a la que se llega desde 08.8 Sistema.
+
+Queda por medir con el mando físico: puntero, rueda y teclas numéricas (qué eventos SDL llegan al port).
+
+## Rendimiento y procesos en segundo plano [comprobado]
+
+Medido el 2026-11-17 con el Home de LG en primer plano, 26 minutos después de encender.
+
+- **La carga media de ~13,7 no es CPU.** La CPU está libre en un 92 %. La carga la suman 13 hilos de drivers de LG que viven en estado D (`hdmi21_rx_engin`, `AUD-KDRV-TASK`, `LGDTV-PMDRV-TAS`, `de_thread`…). No se pueden tocar ni hace falta.
+- **El cuello es la memoria.** De 2,6 GB quedan unos 550 MB disponibles, 60 MB libres de verdad y unos 150 MB en swap.
+- **El mayor consumidor de CPU es `nn-proxy`** (~4,5 % de un núcleo), el proxy de la red neuronal del chip O20. No depende del modo de sonido (igual con `aiSoundPlus` que con `standard`).
+- `cpulimit -p <update> -l 30` limita el servicio `update` al 30 %.
+
+**Apps residentes y precarga.** `com.webos.service.preloadmanager` mantiene unas 20 apps precargadas mientras el Home de LG está en primer plano (`allowedApps` en `/etc/palm/webos-preload-manager-conf.json`). Si se cierran con `closeByAppId` se liberan unos 190 MB, pero en menos de 30 s vuelven YouTube y LG Channels, y además se abren el salvapantallas y la voz. El interruptor real es la política de precarga de cada app:
+
+```sh
+luna-send -n 1 luna://com.webos.service.preloadmanager/getPreloadPolicy '{}'
+luna-send -n 1 luna://com.webos.service.preloadmanager/setPreloadPolicy '{"application":{"id":"youtube.leanback.v4","isEnabled":false}}'
+```
+
+Comprobado con YouTube: con `isEnabled:false` no volvió en 45 s; con `true` quedó restaurado. **No sobrevive a un reinicio**: tras apagar y encender volvió a `isEnabled:true`. HOME tendrá que reaplicar sus interruptores de precarga al arrancar (por ejemplo, desde su gancho `init.d`).
+
+| Precargada | Memoria residente medida | Memoria que pide la política |
+| --- | --- | --- |
+| `com.webos.app.home` (Home de LG) | 177 MB | 40 MB |
+| `youtube.leanback.v4` | 115 MB | 135 MB |
+| `com.webos.app.browser` | ~87 MB (3 procesos) | 72 MB |
+| `airplay` (web) | 65 MB | 50 MB (precarga desactivada; corre igual) |
+| `com.webos.app.lgchannels` | 59 MB | 100 MB |
+| `com.webos.app.inputcommon` (HDMI, TV en vivo) | 58 + 23 MB | 40 MB por entrada |
+| `com.webos.app.voice`, `google.assistant`, `amazon.alexapr`, `netflix`, `amazon` | no estaban abiertas en la medida | 42–100 MB cada una |
+
+**Ajustes que apagan funciones de fondo.** Todos son `com.webos.settingsservice/setSystemSettings` con valores `"on"` u `"off"`, comprobados con ida y vuelta. No se midió si el proceso asociado sale al cambiarlos.
+
+| Ajuste | Categoría / clave | Valor actual | Qué hace |
+| --- | --- | --- | --- |
+| Live Plus (ACR, reconocimiento de contenido) | `option` / `livePlus` | `off` | Ya apagado |
+| Promociones en Home | `general` / `homePromotion` | `off` | Ya apagado |
+| Promociones en TV en vivo | `option` / `livePromotion` | `on` | Anuncios en el canal y la guía |
+| Vídeo promocional de webOS | `option` / `webOSPromotionVideo` | `on` | Vídeo de demostración |
+| Avisos emergentes | `option` / `enableToastPopup` | `on` | Avisos del sistema (los de HOME también usan este canal) |
+| Alertas deportivas | `general` / `sportsAlarm` | `on` | Proceso `sportsalarm` (4 MB) |
+| Anuncio por Bluetooth LE | `network` / `bleAdvertisingOnOff` | `on` | Hace visible la tele a la app móvil |
+| Salvapantallas | `general` / `screenSaverEnabled` | `on` | Abre `com.webos.app.screensaver` |
+| Encendido rápido (Quick Start+) | `option` / `quickStartMode` | `on` | Deja la tele en reposo caliente; apagarlo alarga el arranque |
+
+**Servicios residentes sin interruptor.** Se pararían solo con un `kill` desde `init.d`, lo que sobrevive al reinicio y requiere permiso del usuario. Memoria residente medida:
+- `homeconnect` (ThinQ): 26 MB.
+- `amazon-alexa-adapter`: 13 MB.
+- `airplay`, `homekit` y `airplay-adaptor`: 23 MB.
+- `iot-client`: 9 MB.
+- `sdx`: 9 MB.
+- `nlpmanager`, `voiceinput` y `voiceconductor`: 14 MB.
+- `miracast` y `miracast-tx`: 7,5 MB.
+- `uploadd`: 4,6 MB.
+- `contentminer`: 4,4 MB.
+- `nudge`: 3 MB.
+- `cis`: 3 MB.
+- `appcasting`: 3 MB.
+- `lg.thinqai.adapter`: 2,6 MB.
+
+En total suman unos 120 MB, menos de lo que libera desactivar la precarga de YouTube y el navegador.
+
+## Arranque y encendido [comprobado]
+
+Medido el 2026-11-17 con `systemd-analyze` y `/var/log/bootd.log` tras un arranque.
+
+- **Arranque por snapshot.** El núcleo arranca con `snapshot resume=/dev/mmcblk0p51` (imagen de 150 MB): restaura una imagen de memoria guardada en el eMMC. Quick Start+ (`option/quickStartMode`) está activo.
+- **Cronología desde el núcleo:**
+
+  | Momento | Tiempo |
+  | --- | --- |
+  | Núcleo | 0,85 s |
+  | `snapshot-boot-on` (ruta crítica) | 12,3 s |
+  | `sam-ready` | 13,0 s |
+  | Primera app («Last Input App», hoy `com.webos.app.livetv`) | 13,9 s |
+  | `tv-ready` | 16,6 s |
+  | Mando listo (`mrcu-ready`) | 17,6 s |
+  | `boot-complete` | ~49 s |
+  | Gancho `init.d` | ~36 s |
+  | Precargas de `preloadmanager` (LG Channels, HDMI 1, navegador, voz) | 60–82 s |
+
+  El tiempo del cargador de arranque, antes del núcleo, no se ve desde dentro.
+- **`/etc` es de solo lectura** (squashfs con overlay `ro`). No se pueden enmascarar unidades systemd sin escribir en particiones del sistema, y eso está prohibido. Solo se puede actuar con ajustes Luna, con el gancho `init.d` (corre antes de las precargas) y con `systemctl stop` en tiempo de ejecución.
+- `bootd` abre al encender la última entrada (`Last Input App`), o el Home si `general/homeAutoLaunch` está en `on` (hoy está en `off`).
+- La red en reposo depende de `network/wolwowlOnOff` («TV encendida con móvil», hoy `true`). Tras `power/shutDown` la tele no respondía al ping.
+
+### Ajuste de arranque aplicado (2026-11-17) [comprobado]
+
+Pedido por el usuario: no usa antena y quiere HOME al encender. El gancho `scripts/lg-boot-hook.sh` está instalado en la tele como `/var/lib/webosbrew/init.d/60-home-os`, que corre a unos 32 s del arranque. Deja su registro en `/tmp/home-os-boot.log` y hace tres cosas:
+
+1. Abre HOME (`app.home.tv`) a los ~32 s.
+2. Para con `systemctl stop --no-block` los servicios `legacy-broadcast` (emisión ATSC, 24 MB), `iepg`, `contentminer`, `uploadd` y `nudge`. (Hasta el 2026-11-18 también paraba `utp`; eso rompía Quick Start+, véase «Arranque más rápido».) Se probó en marcha más de 10 minutos, abriendo HDMI 3, HOME y el Home de LG, sin ningún reinicio del vigilante. Sin `--no-block`, `stop nudge` se queda colgado hasta el tiempo límite de systemd. `nudge` vuelve a arrancar más tarde; son 3 MB y se deja así.
+3. Espera a que `preloadmanager` responda (hacia los 48 s) y apaga la precarga de `lgchannels`, `browser`, `voice`, `google.assistant`, `amazon.alexapr`, `amazon`, `livetv`, `livemenu` y `miracast`. Si alguna ya estaba abierta, la cierra. Se mantienen la del Home de LG, las de HDMI, Netflix y YouTube.
+
+Ajustes cambiados una sola vez (persisten solos; entre paréntesis, el valor anterior):
+- `general/homeAutoLaunch` → `on` (`off`);
+- `option/livePromotion` → `off` (`on`);
+- `option/webOSPromotionVideo` → `off` (`on`);
+- `general/sportsAlarm` → `off` (`on`).
+
+| Medida (tras `reboot`) | Antes | Con el gancho |
+| --- | --- | --- |
+| `tv-ready` | 16,6 s | 13,7 s |
+| `boot-complete` | ~49 s | 44 s |
+| HOME en pantalla | no se abría | 32 s |
+| Precargas a los 60–82 s | 4 apps | ninguna |
+| Memoria disponible a los 105 s | ~550 MB | 910 MB |
+
+Con `homeAutoLaunch` en `on`, bootd sigue abriendo la última entrada y pone encima el Home de LG («Cover App»). Entre los ~18 s y los 32 s se ve el Home de LG y después aparece HOME. Para que HOME salga antes hay que usar la vía temprana de Luma: un servicio LS2 que se activa hacia los 18 s y un filtro de teclas en el compositor (véase `com.ecklf.luma/home.sh`, orden `early`). Eso exige que HOME sea el Home, y el port todavía tiene defectos visuales.
+
+**Deshacer:** `rm /var/lib/webosbrew/init.d/60-home-os` y reiniciar. Los servicios y las precargas vuelven solos. Los cuatro ajustes se devuelven a su valor anterior con `setSystemSettings`.
+
+Falta medir el encendido desde el mando con cronómetro: el tiempo antes del núcleo y si el reposo del mando es suspensión o arranque completo.
+
+**Encender con el mando** (2026-11-17, medido): tras apagar y encender con el mando, la tele arrancó de cero, con el tiempo encendido de nuevo en 0 y `getPowerOnReason` → `remoteKey`. En parte se debía a que el gancho paraba `utp`. Pasados unos minutos, Quick Start+ apaga del todo igualmente: véase «Arranque más rápido».
+
+## Arranque más rápido (2026-11-18) [comprobado]
+
+**Qué es Quick Start+ en esta C1.** No es un reposo caliente que dure. Al apagar con el mando:
+1. La tele pasa a `Active Standby` (pantalla apagada y todo en memoria).
+2. Entre 20 s y unos 6 minutos después, `tvpowerd` pasa a `Prepare Suspend` y reinicia la tele (`NL_POWER_STATE` → `Reboot`, `PowerOffReason: quickStart`).
+3. Ese arranque sin pantalla queda en `Active Standby` con `getPowerOnReason` → `quickStart`, renueva la imagen de snapshot y se apaga del todo.
+4. El siguiente encendido es el arranque por snapshot (núcleo y restauración en ~12 s).
+
+Solo un encendido dentro de esa ventana es instantáneo. Se comprobó con `power/powerOff {"reason":"remoteKey"}` y encendido por WoL.
+
+**Por qué antes no había ni esa ventana.** El gancho paraba `utp.service`. Al apagar, `tvpowerd` llama a `luna://com.webos.service.utp.broadcast/getWarmOffStatus`; sin `utp` no hay respuesta. Con `utp` en marcha responde `{"warmOwner":[]}` y existe `Active Standby`. Esto no se repitió sin `utp` (A/B).
+
+**Qué abre bootd al despertar de `Active Standby`.** Reevalúa `/etc/palm/action-condition.json` y abre la última entrada (`Input App`, hoy HDMI 3). No usa `firstAppByPowerOnReason`. bootd sí lee `/var/luna/preferences/bootd.json`, pero no se instaló porque no cambiaría esta ruta. `homeAutoLaunch` no pone el Home de LG.
+
+**Cambios:**
+1. `scripts/lg-boot-hook.sh`:
+   - ya no para `utp`;
+   - apunta cada arranque en `/var/lib/home-os/boot-history.log` (motivo y estado; 40 líneas como máximo);
+   - en un arranque sin pantalla (`quickStart`, estado distinto de `Active`) no abre apps ni para servicios;
+   - deja un vigilante de `tvpower/power/getPowerState`. Al ver `processing: "LastInput Ready"` (solo ocurre al despertar) espera 0,2 s y abre HOME, y vuelve a comprobar a los 3 s. Registro: `/tmp/home-os-wake.log`.
+2. `crates/lume-webos/boot/home-boot.js` es un filtro del compositor, instalado con `scripts/lg-boot-filter.sh install` en `/var/lib/home-os/boot/`. Va en `com.webos.surfacemanager.keyFilters` justo detrás de `homePanelKey`. Se carga hacia los 16 s. En un arranque con pantalla (`Active`), al llegar `minimal-boot-done` abre HOME y lo reintenta una vez a los 6 s. Las teclas pasan sin cambios. La técnica viene de `home-filter.js` de Luma (MIT), escrito de nuevo.
+
+Los dos solo abren HOME si delante hay una entrada (`livetv`, `hdmiN`, `externalinput.*`), el Home de LG o nada. Encender con la tecla de Netflix sigue abriendo Netflix.
+
+**Medidas** (`/var/log/bootd.log`):
+
+| Encendido | Antes | Ahora |
+| --- | --- | --- |
+| Dentro de la ventana de `Active Standby` | no existía (arranque completo) | pantalla a 2,2–3,1 s, HOME a 4,5–4,9 s |
+| Arranque por snapshot (tras `quickStart`, o `reboot`) | HOME a 31–34 s | HOME a 26,2 s (`minimal-boot-done` a 22,7 s) |
+
+Se ve HDMI 3 unos 1,5 s antes de HOME al despertar, y desde los ~19,5 s en el arranque por snapshot. `audiod` siguió activo tras cada arranque.
+
+**Deshacer:**
+- Filtro: `scripts/lg-boot-filter.sh uninstall`.
+- Gancho: volver a la versión anterior (con `utp.service` en el `systemctl stop` y sin vigilante ni historial) y reinstalar con `scp -O`; o `rm /var/lib/webosbrew/init.d/60-home-os`; después reiniciar. `rm /var/lib/home-os/boot-history.log` borra el historial.
+
+**Pendiente:**
+- Comprobarlo con el mando real; aquí se encendió por WoL (`wakeOnWiFi`).
+- Medir cuánto se ve la entrada antes de HOME con cronómetro.
+- No se sabe qué decide el tiempo en `Active Standby` (20 s frente a 6 min). `tvpowerd` tiene un temporizador de apagado forzado cuando `warmOwner` está vacío.
+
+## Luma como Home (2026-11-18) [comprobado]
+
+Decisión del usuario: en la LG se deja HOME (`app.home.tv`) y se usa **Luma**, porque es más rápido y más completo. El panel ⚙ sigue, porque vive en el compositor y no en la app HOME.
+
+- `echo y | sh /media/developer/apps/usr/palm/applications/com.ecklf.luma/home.sh enable` (método `executable` para webOS 6):
+  - monta el ejecutable de Luma sobre `/usr/bin/com.webos.app.home`, así que el botón Home abre Luma;
+  - crea `/var/lib/luma-home`;
+  - instala el gancho `init.d/64-luma-home`;
+  - registra el servicio temprano `com.webos.service.lumahome` (`luma-early`) y el filtro de teclas de Luma, para que un arranque en frío abra Luma hacia los 20 s.
+- `sh /var/lib/luma-home/home.sh startup-home on`: al encender se abre el Home (Luma) en lugar de la última entrada. Guarda la política de entrada anterior.
+- Estado comprobado (`home.sh status`): `enabled`, `mounted`, `bootHook`, `earlyStart` y `startupHome` a `true`. El filtro del panel ⚙ sigue el primero en `keyFilters`.
+- **Deshacer:** `sh /var/lib/luma-home/home.sh startup-home off` y `sh /var/lib/luma-home/home.sh disable`.
+- El gancho de HOME (`60-home-os`) ya no debe abrir `app.home.tv`; conserva el recorte de servicios y precargas.
+
+**Cambio del 2026-11-18 de madrugada.** El usuario pasó a Luma como Home. El gancho ya no abre `app.home.tv` y se quitó el vigilante de despertar. Se desinstaló `home-boot.js` (`lg-boot-filter.sh uninstall`; el código sigue en el repo). El gancho conserva el recorte de servicios (sin `utp`), las precargas y el historial de arranques.
+
+**Always Ready (`general/alwaysOn`).** Estaba en `off`; ahora está en `on` por decisión del usuario, que nota el encendido rápido con él. `tvpowerd` se salta el apagado forzado de `Active Standby` cuando está activo («Forced Power Off Timer skip because alwaysOn is on»). Fuera de horas lo desactiva `alwaysOnDisableStartHour`/`EndHour`, de 1:00 a 6:00 por defecto (se dejaron así). En la única prueba propia (franja movida a 4–5, ya restaurada) la tele hizo igualmente el reinicio `quickStart` a los ~50 s. No se midió el consumo en reposo; mantener el sistema en `Active Standby` gasta más que el apagado completo. Deshacer: `setSystemSettings {"category":"general","settings":{"alwaysOn":"off"}}`.
+
+### Pendiente al cerrar la sesión (2026-11-18)
+
+- **Encendido rápido:** comprobar con el mando real que, con Always Ready, la tele vuelve al instante tras 2–3 min apagada (`/var/lib/home-os/boot-history.log` dice si hubo reinicio `quickStart`). Si no basta, probar a quitar la franja de 1:00 a 6:00 o a registrar una petición de `Active Standby` (`registerActiveStandbyRequest`), con más consumo en reposo.
+- **Luma:** comprobar que el botón Home abre Luma y que Luma es lo primero tras encender, tanto desde el reposo como en un arranque en frío.
+- **Cursor ⚙:** ver arriba; si la política 1 lo quita, dejarla solo en ⚙ y devolver los demás botones a su valor.
+- **Vidrio esmerilado** del panel sobre Luma (`frost` 1): comprobar que la captura no sale negra y que la animación va fluida.
+- `app.home.tv` sigue instalada, pero ya no se usa en la LG.
+
+## Panel rápido con la tecla ⚙ (2026-11-17) [comprobado]
+
+Petición del usuario: que ⚙ abra algo como el Centro de control de HOME sobre cualquier app (bajar el brillo viendo una serie), no los ajustes de LG.
+
+- **Por qué no es una app.** Una app nativa no puede ser una superposición: con `"defaultWindowType": "overlay"` en `appinfo.json`, el sistema sigue registrando HOME como `_WEBOS_WINDOW_TYPE_CARD` y tapa la app de debajo. El panel de ajustes rápidos de LG tampoco es una app: lo dibuja el compositor.
+- **Cómo funciona.** Es un filtro de teclas del compositor (`surface-manager`), la misma vía que usa Luma. `crates/lume-webos/panel/home-panel.js` (ES5) queda primero en `com.webos.service.config` → `com.webos.surfacemanager.keyFilters`. El compositor se suscribe a esa lista y recarga los filtros al momento, sin reiniciarse, y la lista se mantiene tras reiniciar (comprobado). El filtro crea `HomePanel.qml` (más `PanelSlider.qml` y `PanelButton.qml`) como hijo de `compositorWindow.contentItem`, así que dibuja sobre todo, Netflix incluido (comprobado con captura). Los objetos que el cargador da a los filtros (`volume`, `overlayView`…) son proxies sin `parent`; el árbol visual se alcanza por `compositorWindow`.
+- **Comportamiento:**
+  - ⚙ corto abre o cierra el panel; mantenido 0,6 s abre los ajustes de LG (`com.palm.app.settings`, se superpone como antes).
+  - Con el panel abierto: las flechas mueven el foco; Izquierda/Derecha cambian brillo o volumen de 5 en 5; OK activa «Apagar pantalla» o «Más ajustes»; Atrás/Salir cierran.
+  - Las teclas de volumen pasan a LG y el deslizador se actualiza. Cualquier otra tecla cierra el panel y sigue su camino.
+  - Se cierra solo a los 10 s.
+  - El puntero también vale: clic, arrastrar en los deslizadores y clic fuera para cerrar.
+- **Datos:**
+  - Los niveles se leen al abrir con `lunaCall`, que tiene la identidad del compositor (el audio sí le responde).
+  - Las escrituras se agrupan en una cada 80 ms.
+  - Una lectura que llega después de una escritura se descarta.
+  - Un nivel aún desconocido no se mueve, para no partir de 0.
+  - El bus del compositor devuelve números como texto (`"40"`), así que se leen con `parseInt`.
+- **Diseño:** el del Centro de control de HOME: unidades de 1280×720 escaladas, Plus Jakarta Sans y Lucide cargadas con `FontLoader`, y animaciones de 240/160 ms. Sobre vídeo el vidrio es más oscuro (`#b80e141e`). Cerrado no se dibuja (`visible: false`).
+- **Coste medido:** la memoria residente de `surface-manager` no cambia (96,5 MB abierto o cerrado). La CPU se queda en la base del compositor (3–5 ticks en 5 s) con el panel abierto y quieto.
+- **Seguridad:** cada entrada del filtro captura sus errores y devuelve `NextPolicy`. Si el QML no carga, ⚙ vuelve a ser de LG. La primera instalación guarda la lista original en `/var/lib/home-os/keyFilters.orig.json`.
+- **Órdenes:** `scripts/lg-panel.sh install | uninstall | test TECLAS… | shot ARCHIVO`. `install` quita y vuelve a añadir el filtro, porque el compositor solo recarga si la lista cambia. `test` reproduce teclas por el manejador real a través de la configuración `com.webos.surfacemanager.homePanelTest`, y lee el estado en `…homePanelState`. Es la forma de probar sin inyectar teclas.
+- **Pruebas hechas el 2026-11-17:**
+  - abrir, navegar los cuatro controles y cerrar con Atrás;
+  - brillo 40 → 45 → 40 comprobado en la tele, y volumen ±5;
+  - 12 pulsaciones seguidas acaban en el valor exacto (0 y 60);
+  - cierre automático a los 10 s;
+  - ⚙ mantenido abre los ajustes de LG;
+  - persiste tras `reboot`;
+  - se dibuja sobre HOME, el Home de LG y Netflix.
+
+  Comprobado después sobre Netflix reproduciendo, con el mando físico del usuario.
+
+**Arreglos tras probarlo con el mando (2026-11-17):**
+
+- **`CursorShow`/`CursorHide`.** El Magic Remote los manda como teclas al pasar de puntero a botones, justo después de ⚙. Cerraban el panel al instante; ahora se ignoran. Con el panel abierto, la tecla nunca llega a la app aunque el filtro falle (un OK pausaba Netflix).
+- **Caché de QML.** El motor del compositor guarda los componentes por ruta, así que reinstalar en el mismo sitio seguía usando el QML viejo. `lg-panel.sh install` instala cada versión en `/var/lib/home-os/panel/<hash>/` y borra las anteriores.
+- **Volumen con la barra Sonos por HDMI ARC.**
+  - Las teclas de volumen del mando **no pasan por el compositor** ni por el volumen de la tele: no aparecen en los filtros ni en `mrcu/getButtonHistory`, y la tele no tiene códigos IR universales configurados (`ir/getCurrentSavedCodeSetId` → `0xff`).
+  - Ni `audio/master/setVolume`, ni `master/volumeUp` más `volumeKeeping` (lo que hace la tecla en el compositor), ni `com.webos.audio/volumeUp` mueven la Sonos. El usuario lo comprobó de oído; solo cambiaba el contador de la tele.
+  - Solución: el panel lee y fija el volumen de la Sonos por su API local UPnP (`http://<ip>:1400/MediaRenderer/RenderingControl/Control`, `GetVolume`/`SetVolume`) con `XMLHttpRequest`, que funciona en el QML del compositor. El paso es de 2 en 2.
+  - Mientras el panel está abierto pregunta a la Sonos cada segundo, para seguir las teclas del mando. `install` busca la barra en la red (puerto 1400 con `modelName` Arc/Beam/Ray/Playbar) y escribe su IP en el filtro. Hoy: Arc en `192.168.0.169`, Sub en `.175`.
+  - Si la salida no es `external_arc` se usa el volumen de la tele, de 5 en 5.
+- **Una pulsación antes de saber el nivel** se guarda y se aplica cuando llega la lectura, en vez de perderse.
+- **Apagar pantalla:** actúa 300 ms después de soltar OK. Antes, al soltar OK la pantalla volvía a encenderse.
+- **OK sobre Brillo** alterna `picture/energySaving` entre `auto` y `off` (se ve «Auto · N %»). Mover el brillo a mano lo pone en `off`.
+  - Hay sensor de luz: `pqcontroller/getEyeqSensorData` → `{"backlightValue":100,"Eyeqsensorcheck":true}`.
+  - Pero el usuario no vio cambio con `auto` partiendo de 100 % en una sala a oscuras. Queda pendiente averiguar qué mide `backlightValue` y, si sirve, hacer el automático desde el panel.
+- **Cursor:** al abrir, el panel pone `compositorWindow.cursorVisible = false`.
+- **Silencio.** OK sobre Volumen silencia o devuelve el sonido. Con la Sonos usa `RenderingControl` `SetMute`/`GetMute`; con la tele, `audio/master/muteVolume {"mute":…}`. Mover el volumen quita el silencio.
+- **Tarjeta «Ahora»** (`PanelFormats.qml`), permanente arriba del panel. Insignias de formato al estilo de la app Apple TV: los formatos premium (Dolby Vision, Atmos) van rellenos.
+  - **Imagen:** `com.webos.service.videooutput/getStatus`, entrada `MAIN` → `videoInfo.hdrType` (`DolbyVision`, `HDR10`, `HLG`, si no SDR), `height` (2160 → 4K) y `frameRate` (23.976 → 24p). El modo sale de `picture/pictureMode` sin el prefijo `hdr`/`dolbyHdr`, con nombres en español.
+  - **Sonido:** con la Sonos, `DeviceProperties#GetZoneInfo` → `HTAudioIn`, traducido con la tabla de la librería SoCo (por ejemplo, `84934714` es Dolby Digital Plus 5.1). Con otra salida se muestra cuál es (altavoces, Bluetooth, óptico, ARC).
+  - Se lee una vez al abrir.
+- **Brillo, lo que hay (2026-11-17):**
+  - Los ajustes de imagen se guardan aparte por entrada y por tipo de contenido (`dimension`: `input`, `dynamicRange` sdr/hdr/dolbyHdr, `pictureMode`). El panel cambia el del contenido actual.
+  - En Dolby Vision, `energySaving: auto` no atenúa.
+  - No hay ajuste controlable de brillo por sensor: `eyeq` es solo un indicador de «modificado», y `ambientLightCompensation` no existe en la C1. `getEyeqSensorData` siempre devuelve `backlightValue: 100`.
+  - Palancas disponibles: `pictureMode` (21 modos), `peakBrightness` y `dynamicContrast` (off/low/medium/high), `eyeComfortMode`, y `energySaving` (auto/off/min/med/max).
+- **Modo de imagen** (fila con ‹ ›). Recorre la lista de su tipo de contenido y salta los modos que la tele rechaza.
+  - SDR acepta `vivid normal eco cinema sports game filmMaker expert1 expert2`; `photo` se rechaza (comprobado).
+  - Los modos `dolbyHdr*` solo se aceptan con contenido Dolby Vision en pantalla.
+- **Modo noche** (botón con disco azul y horario debajo):
+  - Guarda los valores del usuario de `backlight`, `peakBrightness`, `dynamicContrast` y `eyeComfortMode`, y aplica brillo mín(actual, nivel de noche; 0 por petición del usuario), pico off, contraste dinámico off y confort visual on.
+  - Al apagarlo devuelve los valores (comprobado: low/off vuelven exactos).
+  - La tele **solo escribe el modo que está en pantalla**: `setSystemSettings` con `dimension` explícita devuelve `errorKey`. Por eso se trabaja por modo, con la clave `input|dynamicRange|pictureMode`, cada vez que ese modo aparece (al abrir el panel, al cambiar de modo o cada minuto).
+  - El estado y los valores guardados persisten en `com.webos.surfacemanager.homePanelNight`.
+- **Horario:** `com.webos.surfacemanager.homePanelSchedule` (`lg-panel.sh night 22:00 07:00 0`, o `night off`).
+  - Se enciende y apaga al cruzar el inicio o el final. Un cambio manual se mantiene hasta el siguiente cruce.
+  - El primer chequeo tras cargar actúa si toca: el 2026-11-17 a las 22:54 se encendió solo, como debía.
+  - La comprobación de cada minuto no llama a nada si el modo noche está apagado y no hay valores guardados.
+- **Diseño aplicado (2026-11-17)**, de `docs/design/panel-rapido-lg.md`.
+  - Orden: tarjeta «Ahora» (sin el modo), Brillo, Modo noche (ancho completo), Volumen, Modo de imagen, y Apagar pantalla | Más ajustes.
+  - Foco por tabla de filas, sin dar la vuelta y recordando la mitad usada. El foco lleva halo de 3 u y escala 1,03.
+  - Encendido es un disco relleno, nunca la cápsula blanca. El vidrio está al 78 % (`#c70e141e`).
+  - Modo de imagen: el nombre cambia al momento y el modo se escribe 600 ms después de la última pulsación, con puntos de posición. No actúa hasta conocer el modo, y una lectura no deshace un cambio en curso.
+  - El usuario quitó el botón «Horario» (el horario sigue solo, con `lg-panel.sh night`) y la velada oscura lateral.
+  - Un cambio manual del modo noche se guarda (`manual: true`) y dura hasta el siguiente cruce del horario, también tras reiniciar.
+- **Material Liquid Glass (2026-11-17)**, diseño de Figma, página «10 · Panel rápido (⚙)».
+  - `PanelGlass.qml` es un `ShaderEffect` por control. Dibuja la forma con SDF, el tinte, la banda de lente, el filo especular iluminado desde arriba (al 55 % con el modo noche), una sombra interior y la de profundidad. Los colores se pasan premultiplicados a mano (`vector4d`).
+  - **Sobre gráficos** (`frost` 1) usa una instantánea compartida de lo que hay detrás de la columna. Es un `ShaderEffectSource` de la raíz de vistas, que no contiene el panel, a media resolución, con `live: false`. Se toma al abrir y cada 1 s, y pasa por `FastBlur` con radio 32.
+  - **Sobre vídeo** (`frost` 0, cuando `videooutput` tiene una salida `MAIN` conectada) no hay desenfoque, porque el vídeo es un plano de hardware: tinte de 70 a 80 %, filo y sombras.
+  - **La línea de botones redondos** sustituye a la fila grande del modo noche, que el usuario pidió más abajo y más pequeña.
+  - Coste medido con el panel abierto sobre vídeo: `surface-manager` pasa de unos 8 a unos 30 ticks en 5 s (≈ 6 % de un núcleo), con las lecturas de la Sonos incluidas, y sin cambio de memoria.
+  - **Falta comprobar el modo esmerilado sobre HOME**, y si la instantánea de una app web sale negra.
+- **Brillo real con Auto.** `com.webos.service.pqcontroller/getInfo {"key":"backlight"}` da el nivel que aplica el driver.
+  - Medido con el ajuste a 45: `energySaving` `off` → 45; `auto` en sala oscura → 23 y luego 21; `max` → 0. El ajuste `backlight` no cambia en ninguno.
+  - Con Auto activo, el panel pide ese valor cada 2 s mientras está abierto y muestra «Auto · 21 %». Al desactivar Auto vuelve al nivel de antes (comprobado: 45).
+  - Con el modo noche activo, OK sobre Brillo muestra 1,5 s «Primero desactiva Modo noche».
+  - Con el modo noche activo, mover el brillo guarda el nivel de noche.
+- **Cursor al pulsar ⚙: no tiene solución sin tocar otros botones.**
+  - Lo muestra a propósito el servicio de entrada del mando (`lginput2`). `mrcu/getCursorHistory` dice «Cursor Show(SHOW KEY_SETTINGS Press)»; una flecha lo oculta («STANDBY»).
+  - Ocultarlo desde el compositor (`compositor.cursorVisible`, `compositorWindow.cursorVisible`, tragarse `CursorShow`) no sirvió.
+  - El interruptor es `mrcu/setHotkeyCursorPolicy {"button": <número>, "cursorPolicy": 0|1|2}`, pero el número de `KEY_SETTINGS` no está documentado. Al final el usuario pidió probarlo: un barrido puso `cursorPolicy: 1` en los botones 203–1023 (todos devolvieron `returnValue: true`, así que la respuesta no dice cuál es ⚙). **Sin verificar:** falta pulsar ⚙ y ↓ y leer `getCursorHistory`; los reinicios posteriores pueden haber devuelto las políticas a su valor de fábrica.
+  - Leer `/dev/input/event*` no sirve: `lginput2` se queda el dispositivo y no llega nada.
+
+**Incidente (2026-11-17).** Un `grep -r` sobre `/var/palm/jail` se quedó colgado y, unos dos minutos después, la tele se reinició sola con `PowerOnReason: cpuAbnormal` (el vigilante del sistema). Lección: **en la tele nunca hagas búsquedas recursivas en carpetas del sistema** (`/var/palm`, `/proc`, `/dev`, `/media`). Usa rutas concretas y comandos acotados.
 
 ## Diseño híbrido HOME × Luma
 
@@ -1271,7 +1599,8 @@ Los puertos 3000 y 3001 están abiertos [comprobado]. Es el protocolo que usan l
 
 - El arranque en frío con la sustitución del Home activa, y que SSH arranque solo tras reiniciar.
 - Rendimiento de `lume-core` en la GPU de la C1 y si el compositor expone la edad del búfer.
-- Qué servicios Luna dan brillo del panel OLED, modo de imagen, entradas y temporizador con root.
+- Si los ajustes de LG (por ejemplo `sportsAlarm`) hacen salir su proceso al apagarlos.
+- Puntero, rueda y teclas numéricas del Magic Remote en el port.
 - El lanzamiento en el simulador y la captura de pantalla con `ares`. El usuario preguntó si se puede usar el simulador del Mac: para el port nativo no sirve (solo ejecuta apps web).
 - Si `lume-webos` compila tras los últimos cambios del núcleo; no hay pruebas propias del crate.
 

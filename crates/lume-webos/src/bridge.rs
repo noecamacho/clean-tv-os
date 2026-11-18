@@ -40,16 +40,52 @@ fn call(uri: &str, payload: Value) -> Option<Value> {
     Some(value)
 }
 
+/// Calls `uri` as root through Homebrew Channel's `exec` (`luna-send` in a shell).
+///
+/// webOS grants a developer-installed app only the `public` ACG, whatever `requiredACG` asks,
+/// and the audio service refuses HOME ("Message status unknown") even for `master/getVolume`.
+/// Only the calls that need it come this way; each costs one shell process on the TV.
+fn call_as_root(uri: &str, payload: Value) -> Option<Value> {
+    // Both are built here (fixed URI, JSON of numbers), but quote them anyway.
+    let quote = |text: &str| format!("'{}'", text.replace('\'', "'\\''"));
+    let command = format!(
+        "luna-send -n 1 -w 3000 {} {}",
+        quote(uri),
+        quote(&payload.to_string())
+    );
+    let reply = call(
+        "luna://org.webosbrew.hbchannel.service/exec",
+        json!({ "command": command }),
+    )?;
+    let out = reply.get("stdoutString").and_then(Value::as_str)?;
+    let value: Value = match serde_json::from_str(out.trim()) {
+        Ok(value) => value,
+        Err(e) => {
+            log::warn!(
+                "{uri} as root: no JSON ({e}): {}",
+                &out[..out.len().min(120)]
+            );
+            return None;
+        }
+    };
+    if value.get("returnValue").and_then(Value::as_bool) == Some(false) {
+        log::warn!("{uri} as root: refused: {}", &out[..out.len().min(240)]);
+        return None;
+    }
+    Some(value)
+}
+
 /// One installed app as the launcher needs it, plus where its icon files live.
 struct AppIcons {
     icon: Option<PathBuf>,
     large: Option<PathBuf>,
 }
 
-#[derive(Default)]
 pub struct Bridge {
     /// Icon paths by app id, filled by the scans.
     icons: HashMap<String, AppIcons>,
+    /// Where copies of icons the app jail cannot read are kept (inside the data dir).
+    icon_cache: PathBuf,
 }
 
 fn icon_path(point: &Value, key: &str) -> Option<PathBuf> {
@@ -58,7 +94,86 @@ fn icon_path(point: &Value, key: &str) -> Option<PathBuf> {
     (!text.is_empty() && text.ends_with(".png")).then(|| PathBuf::from(text))
 }
 
+/// A file name for `id` that needs no shell quoting (webOS ids are reverse-DNS).
+fn safe_name(id: &str) -> Option<&str> {
+    (!id.is_empty()
+        && id.len() <= 128
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-')))
+    .then_some(id)
+}
+
 impl Bridge {
+    pub fn new(data_dir: &std::path::Path) -> Bridge {
+        Bridge {
+            icons: HashMap::new(),
+            icon_cache: data_dir.join("icons"),
+        }
+    }
+
+    /// The app runs jailed and only sees its own package: the other apps' icons (under
+    /// /usr/palm and /media/cryptofs) are copied once, as root, through Homebrew Channel's
+    /// `exec` into the data dir, which the jail does see. Paths go through a list file, so
+    /// nothing from the app list is pasted into the shell command.
+    /// shortcut: a copy is never refreshed when an app updates its icon; delete the icons
+    /// folder (or compare mtimes here) if stale icons ever show up.
+    fn mirror_unreadable_icons(&mut self) {
+        let mut wanted = String::new();
+        for (id, icons) in &mut self.icons {
+            let Some(name) = safe_name(id) else { continue };
+            for (slot, suffix) in [(&mut icons.large, "large"), (&mut icons.icon, "icon")] {
+                let Some(source) = slot.as_ref() else {
+                    continue;
+                };
+                if source.exists() {
+                    continue;
+                }
+                let copy = self.icon_cache.join(format!("{name}-{suffix}.png"));
+                if !copy.exists() {
+                    let source = source.to_string_lossy();
+                    if source.contains(['\n', '\t']) {
+                        continue;
+                    }
+                    wanted.push_str(&format!("{source}\t{}\n", copy.display()));
+                }
+                *slot = Some(copy);
+            }
+        }
+        if wanted.is_empty() {
+            return;
+        }
+        let list = self.icon_cache.join("wanted.txt");
+        if let Err(e) = std::fs::create_dir_all(&self.icon_cache)
+            .and_then(|()| std::fs::write(&list, wanted.as_bytes()))
+        {
+            log::warn!("icon list: {e}");
+            return;
+        }
+        let command = format!(
+            "while IFS=\"$(printf '\\t')\" read -r src dst; do cp -f \"$src\" \"$dst\" && chmod 644 \"$dst\"; done < '{}'",
+            list.display()
+        );
+        let started = std::time::Instant::now();
+        let reply = match luna::call(
+            "luna://org.webosbrew.hbchannel.service/exec",
+            &json!({ "command": command }).to_string(),
+            Duration::from_secs(20),
+        ) {
+            Ok(reply) => reply,
+            Err(e) => {
+                log::warn!("icon copy through Homebrew Channel: {e}");
+                return;
+            }
+        };
+        log::info!(
+            "copied {} icons in {} ms ({})",
+            wanted.lines().count(),
+            started.elapsed().as_millis(),
+            &reply[..reply.len().min(160)]
+        );
+    }
+
     /// Every visible app, through `listLaunchPoints` (what LG's own Home lists).
     pub fn scan_all(&mut self) -> Vec<Discovered> {
         let Some(reply) = call(
@@ -71,7 +186,7 @@ impl Bridge {
             log::warn!("listLaunchPoints: no launchPoints array");
             return Vec::new();
         };
-        let mut apps = Vec::new();
+        let mut found = Vec::new();
         for point in points {
             let Some(id) = point.get("id").and_then(Value::as_str) else {
                 continue;
@@ -89,31 +204,42 @@ impl Bridge {
                 || ["com.webos.", "com.palm.", "com.lge."]
                     .iter()
                     .any(|prefix| id.starts_with(prefix));
-            let icons = AppIcons {
-                icon: icon_path(point, "icon"),
-                large: icon_path(point, "largeIcon"),
-            };
-            // The color thumbnail comes from the best icon file.
-            let icon = icons
-                .large
-                .as_deref()
-                .or(icons.icon.as_deref())
-                .and_then(icons::decode_png)
-                .map(|decoded| {
-                    icons::color_thumbnail(&decoded, lume_core::catalog::color::ICON_SIZE)
-                });
-            self.icons.insert(id.to_string(), icons);
-            apps.push(Discovered {
-                package: id.to_string(),
-                label: title,
-                // webOS launches by id alone; the activity field stays empty.
-                activity: String::new(),
-                leanback: true,
-                system,
-                icon,
-            });
+            self.icons.insert(
+                id.to_string(),
+                AppIcons {
+                    icon: icon_path(point, "icon"),
+                    large: icon_path(point, "largeIcon"),
+                },
+            );
+            found.push((id.to_string(), title, system));
         }
-        apps
+        self.mirror_unreadable_icons();
+        found
+            .into_iter()
+            .map(|(id, label, system)| {
+                // The color thumbnail comes from the best icon file.
+                let icon = self.icons.get(&id).and_then(|icons| {
+                    icons
+                        .large
+                        .as_deref()
+                        .and_then(icons::decode_png)
+                        .or_else(|| icons.icon.as_deref().and_then(icons::decode_png))
+                        .filter(|decoded| !icons::is_glyph(decoded))
+                        .map(|decoded| {
+                            icons::color_thumbnail(&decoded, lume_core::catalog::color::ICON_SIZE)
+                        })
+                });
+                Discovered {
+                    package: id,
+                    label,
+                    // webOS launches by id alone; the activity field stays empty.
+                    activity: String::new(),
+                    leanback: true,
+                    system,
+                    icon,
+                }
+            })
+            .collect()
     }
 
     /// The icon paths of `package`, scanning once if this process has not scanned yet
@@ -164,9 +290,18 @@ impl Bridge {
         .is_some()
     }
 
+    /// Launches LG's settings (or any app) on a `target` section when one is given.
+    pub fn launch_with(&self, id: &str, target: Option<&str>) -> bool {
+        let payload = match target {
+            Some(target) => json!({ "id": id, "params": { "target": target } }),
+            None => json!({ "id": id }),
+        };
+        call("luna://com.webos.applicationManager/launch", payload).is_some()
+    }
+
     /// The media volume (0 to 100), and whether it can be read at all.
     pub fn volume(&self) -> Option<u8> {
-        let reply = call("luna://com.webos.service.audio/master/getVolume", json!({}))?;
+        let reply = call_as_root("luna://com.webos.service.audio/master/getVolume", json!({}))?;
         let status = reply.get("volumeStatus")?;
         status
             .get("volume")
@@ -175,7 +310,7 @@ impl Bridge {
     }
 
     pub fn set_volume(&self, percent: u8) -> bool {
-        call(
+        call_as_root(
             "luna://com.webos.service.audio/master/setVolume",
             json!({ "volume": percent.min(100) }),
         )

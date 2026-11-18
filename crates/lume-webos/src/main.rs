@@ -9,6 +9,8 @@
 mod bridge;
 mod icons;
 #[cfg(target_arch = "arm")]
+mod levels;
+#[cfg(target_arch = "arm")]
 mod luna;
 #[cfg(target_arch = "arm")]
 mod sdl;
@@ -28,6 +30,7 @@ fn main() {
 #[cfg(target_arch = "arm")]
 mod tv {
     use crate::bridge::Bridge;
+    use crate::levels::{Done, Job, Levels};
     use crate::sdl;
     use lume_core::app::{Effect, Key};
     use lume_core::render::Gles2Backend;
@@ -71,8 +74,11 @@ mod tv {
             .find_map(|dir| std::fs::read(dir.join(name)).ok())
     }
 
+    /// SAM sends a native app's stderr to /dev/null, so the log also goes to `home.log` in the
+    /// data dir (started afresh on every launch).
     struct StderrLogger {
         started: Instant,
+        file: std::sync::Mutex<Option<std::fs::File>>,
     }
 
     impl log::Log for StderrLogger {
@@ -82,12 +88,19 @@ mod tv {
 
         fn log(&self, record: &log::Record) {
             if self.enabled(record.metadata()) {
-                eprintln!(
+                let line = format!(
                     "home {:>7.1}s {} {}",
                     self.started.elapsed().as_secs_f32(),
                     record.level(),
                     record.args()
                 );
+                eprintln!("{line}");
+                if let Ok(mut file) = self.file.lock() {
+                    if let Some(file) = file.as_mut() {
+                        use std::io::Write;
+                        let _ = writeln!(file, "{line}");
+                    }
+                }
             }
         }
 
@@ -126,6 +139,8 @@ mod tv {
         /// Whether the Control Center was on screen at the last key.
         in_controls: bool,
         levels_read: Instant,
+        /// Levels and radios go through a worker thread (see `levels`).
+        levels: Levels,
         icons_failed: HashSet<String>,
         dock_failed: HashSet<String>,
         icons_pending: bool,
@@ -134,7 +149,13 @@ mod tv {
 
     pub fn main() {
         let started = Instant::now();
-        let logger = Box::leak(Box::new(StderrLogger { started }));
+        let _ = std::fs::create_dir_all(DATA_DIR);
+        let logger = Box::leak(Box::new(StderrLogger {
+            started,
+            file: std::sync::Mutex::new(
+                std::fs::File::create(Path::new(DATA_DIR).join("home.log")).ok(),
+            ),
+        }));
         let _ = log::set_logger(logger);
         log::set_max_level(log::LevelFilter::Info);
         std::panic::set_hook(Box::new(|info| log::error!("panic: {info}")));
@@ -158,7 +179,7 @@ mod tv {
         lume_core::wallpaper::set_ready_notifier(wallpaper_ready);
         lume_core::wallpaper::set_cache_dir(files.join("cache"));
 
-        let mut bridge = Bridge::default();
+        let mut bridge = Bridge::new(&files);
         let locales = bridge.locales();
         let clock = bridge.clock();
         let mut shell = {
@@ -190,6 +211,7 @@ mod tv {
         shell.wake(width, height);
         log::info!("window {width}x{height} (drawable {}x{})", size.0, size.1);
 
+        let levels = Levels::start(&files);
         let mut runtime = Runtime {
             window,
             backend,
@@ -206,6 +228,7 @@ mod tv {
             pressed: false,
             in_controls: false,
             levels_read: Instant::now(),
+            levels,
             icons_failed: HashSet::new(),
             dock_failed: HashSet::new(),
             icons_pending: false,
@@ -237,6 +260,7 @@ mod tv {
                 if self.in_controls && self.visible && self.levels_read.elapsed() >= LEVELS_EVERY {
                     self.refresh_levels();
                 }
+                self.apply_levels();
                 if self.sleep_at.is_some_and(|at| Instant::now() >= at) {
                     self.sleep_at = None;
                     self.shell.set_sleep_timer(0);
@@ -371,9 +395,7 @@ mod tv {
         fn refresh_system_settings(&mut self) {
             self.shell.set_locales(&self.bridge.locales());
             self.shell.set_clock(self.bridge.clock());
-            if let Some(radios) = self.bridge.radios() {
-                self.shell.set_radios(radios.0, radios.1);
-            }
+            self.levels.send(Job::Radios);
             self.refresh_levels();
         }
 
@@ -388,10 +410,20 @@ mod tv {
 
         fn refresh_levels(&mut self) {
             self.levels_read = Instant::now();
-            let volume = self.bridge.volume();
-            let backlight = self.bridge.backlight();
-            if let (Some(volume), Some(backlight)) = (volume, backlight) {
-                self.shell.set_levels(backlight, volume, None);
+            self.levels.request_read();
+        }
+
+        /// Applies what the levels worker answered since the last turn.
+        fn apply_levels(&mut self) {
+            while let Some(done) = self.levels.try_recv() {
+                match done {
+                    // u8::MAX marks a failed read: keep showing the last known levels.
+                    Done::Levels { volume, backlight } if volume <= 100 && backlight <= 100 => {
+                        self.shell.set_levels(backlight, volume, None);
+                    }
+                    Done::Levels { .. } => {}
+                    Done::Radios { wifi, bluetooth } => self.shell.set_radios(wifi, bluetooth),
+                }
             }
         }
 
@@ -406,9 +438,7 @@ mod tv {
             );
             if controls && !self.in_controls {
                 self.refresh_levels();
-                if let Some(radios) = self.bridge.radios() {
-                    self.shell.set_radios(radios.0, radios.1);
-                }
+                self.levels.send(Job::Radios);
             }
             self.in_controls = controls;
         }
@@ -427,9 +457,16 @@ mod tv {
                         log::warn!("the TV settings could not be opened");
                     }
                 }
-                Effect::OpenTvSetting { .. } => {
-                    // webOS has no deep links into settings panes HOME knows; the app opens whole.
-                    if !self.bridge.launch("com.palm.app.settings") {
+                Effect::OpenTvSetting { setting } => {
+                    use lume_core::keys::SettingShortcut;
+                    // Targets read from LG's settings app and checked on the C1: "ExternalDevice"
+                    // opens the Bluetooth page; "network" stops at General, with Network in it.
+                    let target = match setting {
+                        SettingShortcut::Bluetooth => Some("ExternalDevice"),
+                        SettingShortcut::Wifi => Some("network"),
+                        _ => None,
+                    };
+                    if !self.bridge.launch_with("com.palm.app.settings", target) {
                         log::warn!("the TV settings could not be opened");
                     }
                 }
@@ -460,16 +497,8 @@ mod tv {
                     // the confirmation Android's uninstaller gives.
                     log::info!("uninstall of {package}: not wired on webOS");
                 }
-                Effect::SetVolume(percent) => {
-                    if !self.bridge.set_volume(percent) {
-                        self.refresh_levels();
-                    }
-                }
-                Effect::SetBrightness(percent) => {
-                    if !self.bridge.set_backlight(percent) {
-                        self.refresh_levels();
-                    }
-                }
+                Effect::SetVolume(percent) => self.levels.send(Job::SetVolume(percent)),
+                Effect::SetBrightness(percent) => self.levels.send(Job::SetBacklight(percent)),
                 Effect::SetAutoBrightness(_) => {
                     // No light-sensor API was found on this TV; the toggle stays inert.
                     self.refresh_levels();

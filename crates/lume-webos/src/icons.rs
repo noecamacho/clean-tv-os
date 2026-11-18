@@ -109,6 +109,13 @@ pub fn fit_cell(source: &Decoded, width: u32, height: u32) -> Vec<u8> {
     cell
 }
 
+/// Whether the icon is a glyph on transparency (LG's system apps) rather than a full-bleed
+/// logo: tinting the tile with a glyph's own color would hide the glyph.
+pub fn is_glyph(source: &Decoded) -> bool {
+    let opaque = source.rgba.chunks_exact(4).filter(|p| p[3] >= 128).count();
+    opaque * 2 < source.rgba.len() / 4
+}
+
 /// A small ARGB thumbnail for deriving the tile color (see `catalog::color`).
 pub fn color_thumbnail(source: &Decoded, side: usize) -> Vec<u32> {
     let mut pixels = Vec::with_capacity(side * side);
@@ -156,6 +163,16 @@ mod tests {
         let premultiplied = (200.0_f32 * 128.0 / 255.0).round() as u8;
         assert_eq!(cell[center], premultiplied);
         assert_eq!(cell[center + 3], 128);
+    }
+
+    #[test]
+    fn a_mostly_transparent_icon_is_a_glyph() {
+        let mut glyph = solid(10, 10, [0, 0, 0, 0]);
+        for p in glyph.rgba.chunks_exact_mut(4).take(30) {
+            p.copy_from_slice(&[120, 60, 200, 255]);
+        }
+        assert!(is_glyph(&glyph));
+        assert!(!is_glyph(&solid(10, 10, [120, 60, 200, 255])));
     }
 
     #[test]

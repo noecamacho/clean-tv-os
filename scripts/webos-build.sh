@@ -3,7 +3,8 @@
 #
 # Needs: docker (image lume-toolchain:latest), ares-package (webOS CLI), and the webOS NDK
 # unpacked at ~/Projects/.clean-tv-os-private/webos-ndk/arm-webos-linux-gnueabi_sdk-buildroot
-# (linux-aarch64 build of webosbrew/native-toolchain, release webos-d7ed7ee.6).
+# (on an arm64 Mac: linux-aarch64 build of webosbrew/native-toolchain, release webos-d7ed7ee.6;
+# on x86_64 Linux: openlgtv/buildroot-nc4 release webos-d7ed7ee, arm-webos-linux-gnueabi_sdk-buildroot.tar.gz).
 #
 # The SDL-webOS runtime (the TV needs SDL's Wayland backend; the NDK's SDL is a link stub)
 # is downloaded once and verified against Luma's pinned SHA-256 hashes.
@@ -36,7 +37,7 @@ if [ ! -f "$SDL_DIR/libSDL2-2.0.so.0" ] \
       "https://github.com/webosbrew/SDL-webOS/releases/download/$SDL_RELEASE/SDL2-2.30.12-webos.tar.gz"
   fi
   echo "$SDL_ARCHIVE_SHA  $archive" | shasum -a 256 -c - >/dev/null
-  tar -xzf "$archive" -C "$SDL_DIR" --include '*/libSDL2-2.0.so.0.*' 2>/dev/null || true
+  tar -xzf "$archive" -C "$SDL_DIR"
   found="$(find "$SDL_DIR/lib" -name 'libSDL2-2.0.so.0.*' -type f | head -1)"
   [ -n "$found" ] || { echo "libSDL2-2.0.so.0.* not in the archive" >&2; exit 1; }
   cp "$found" "$SDL_DIR/libSDL2-2.0.so.0"
@@ -45,6 +46,8 @@ fi
 
 # --- Toolchain image (lume-toolchain + the ARM gnueabi Rust target) ---
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+  docker image inspect lume-toolchain:latest >/dev/null 2>&1 \
+    || docker build --target toolchain -t lume-toolchain:latest -f "$ROOT/docker/Dockerfile" "$ROOT"
   docker build -t "$IMAGE" -f "$ROOT/docker/Dockerfile.webos" "$ROOT"
 fi
 
@@ -86,10 +89,18 @@ cp "$ROOT/crates/lume-webos/webos/app-icon-large.png" "$STAGE/"
 cp "$ROOT/dist/webos/home" "$STAGE/home"
 chmod +x "$STAGE/home"
 cp "$SDL_DIR/libSDL2-2.0.so.0" "$STAGE/lib/"
+# The wallpapers (QOI), read at run time from assets/wallpaper next to the binary.
+mkdir -p "$STAGE/assets/wallpaper"
+cp "$ROOT"/crates/lume-core/assets/wallpaper/* "$STAGE/assets/wallpaper/"
 cat > "$STAGE/licenses/README.md" <<'EOF'
 - lib/libSDL2-2.0.so.0: SDL-webOS (github.com/webosbrew/SDL-webOS, zlib license),
   prebuilt release-2.30.12-webos.5, bundled unmodified.
 - home: HOME (this repository), GPL-3.0-or-later.
 EOF
-ares-package --no-minify -o "$ROOT/dist" "$STAGE"
+# ares-package from the webOS CLI; without a global install, run it through npx.
+if command -v ares-package >/dev/null; then
+  ares-package --no-minify -o "$ROOT/dist" "$STAGE"
+else
+  npx -y -p @webos-tools/cli ares-package --no-minify -o "$ROOT/dist" "$STAGE"
+fi
 ls -la "$ROOT"/dist/*.ipk

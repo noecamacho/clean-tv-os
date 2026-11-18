@@ -7,6 +7,8 @@ Los cambios de HOME, del más reciente al más antiguo. El formato sigue
 
 ### Añadido
 
+- **LG: encendido más rápido.** El gancho de arranque ya no para `utp` (sin él, Quick Start+ no tenía reposo caliente), abre HOME al despertar (~4,7 s en vez de un arranque completo) y no actúa en el arranque `quickStart` sin pantalla. El nuevo filtro del compositor `crates/lume-webos/boot/home-boot.js` (`scripts/lg-boot-filter.sh`) abre HOME a 26 s del arranque en vez de 31–34 s. Véase «Arranque más rápido» en `docs/llm-wiki/lg-webos.md`.
+- **LG: Luma como Home.** El gancho deja de abrir HOME, sin vigilante de despertar; `home-boot.js` desinstalado. Always Ready (`general/alwaysOn`) activado a petición del usuario.
 - **HOME para la LG OLED55C1PSA (webOS 6.5.3, rooteada):** crate `crates/lume-webos` (SDL2 por
   FFI, GLES2 de `lume-core`, puente al bus Luna), paquete aparte `app.home.tv` 0.1.0,
   `scripts/webos-build.sh`, `docker/Dockerfile.webos` y el mando virtual `scripts/lg-key.sh`.
@@ -14,6 +16,47 @@ Los cambios de HOME, del más reciente al más antiguo. El formato sigue
   no cambia.
 - `docs/llm-wiki/lg-webos.md`: root, sustitución del Home, estado del port y diseño híbrido
   HOME × Luma (Figma, página 06).
+- `docs/llm-wiki/lg-webos.md`: API del bus Luna comprobada en la LG (entradas, volumen exacto,
+  brillo `backlight`, modos, temporizador, pantalla apagada, cerrar apps, avisos) e inventario
+  de rendimiento: precarga de apps por `preloadmanager/setPreloadPolicy`, ajustes de fondo
+  reversibles y memoria de los servicios residentes. Apagado por `tvpower/power/shutDown`, gancho `init.d`
+  comprobado en un arranque y precarga que no sobrevive al reinicio.
+- `scripts/lg-boot-hook.sh`: gancho de arranque de la LG (instalado como `init.d/60-home-os`) que
+  abre HOME a los ~32 s, para la emisión por antena y servicios de LG sin uso y apaga nueve
+  precargas; 910 MB libres tras arrancar frente a ~550 MB.
+- **Panel rápido en la LG:** la tecla ⚙ abre sobre cualquier app un panel con el diseño del
+  Centro de control de HOME (brillo, volumen, apagar pantalla, más ajustes). Mantenerla
+  pulsada abre los ajustes de LG, como antes. Es un filtro de teclas del compositor
+  (`crates/lume-webos/panel/`) que se instala y se quita con `scripts/lg-panel.sh`.
+  Con la barra Sonos por HDMI ARC, el deslizador de volumen mueve la Sonos por su API de red
+  local y sigue los cambios hechos con el mando.
+  OK sobre Volumen silencia. Una tarjeta «Ahora» muestra el formato de imagen (Dolby
+  Vision/HDR/SDR, resolución, fotogramas, modo) y el de sonido que recibe la Sonos (Atmos, 5.1…).
+  Nuevos: selector de modo de imagen y «Modo noche» (menos brillo, sin pico ni contraste
+  dinámico, confort visual) que devuelve los valores del usuario; con horario (22:00–07:00 por
+  defecto, `lg-panel.sh night`).
+  Rediseño del panel según `docs/design/panel-rapido-lg.md` (orden por uso, foco con halo,
+  modo de imagen con retardo y puntos, «Sin conexión»). Con Auto, el brillo muestra el valor
+  real que aplica la tele y vuelve al anterior al desactivarlo.
+  Material Liquid Glass (`PanelGlass.qml`): vidrio esmerilado sobre interfaces y vidrio claro
+  sobre vídeo; el modo noche pasa a un botón redondo en la última fila.
+
+- **LG: Luma como Home.** Por decisión del usuario, el launcher de la LG pasa a ser Luma (botón
+  Home y encendido), instalado con su propio `home.sh enable` y `startup-home on`. El panel ⚙
+  se mantiene.
+
+### Corregido
+
+- **HOME en la LG (`app.home.tv` 0.1.1):**
+  - el fondo de pantalla vuelve, porque el ipk ahora lleva los fondos;
+  - las apps muestran su icono: HOME los copia como root desde fuera de su jaula a través de
+    Homebrew Channel;
+  - el Centro de control ya no se congela: una sola conexión al bus, niveles en un hilo aparte y
+    volumen leído como root, porque el audio no responde a apps de desarrollo;
+  - el primer fotograma sale a 0,57 s (antes, 7 s);
+  - el registro queda en `/media/developer/app.home.tv/home.log`.
+- `scripts/webos-build.sh` funciona en Linux x86_64 y `scripts/lg-key.sh` usa la clave propia si
+  no está `oled_root`.
 
 ## [0.9.7] - 2026-11-15
 

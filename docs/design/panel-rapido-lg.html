@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel rápido LG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700&display=swap">
+<style>
+/* Mock of docs/design/panel-rapido-lg.md. Every size is in HOME's 1280x720 units: --u is one unit,
+   so each .tv frame is exactly 1920x1080 when the page is 1920 px wide (1 u = 1.5 px).
+   No backdrop-filter anywhere: the compositor cannot blur the video plane. */
+:root {
+  --page: #0b0d12;
+  --text: #e8ebf0;
+  --muted: #9aa3b2;
+  --glass: rgba(14, 20, 30, .78);   /* proposed #c70e141e (today #b80e141e) */
+  --edge: rgba(255, 255, 255, .31); /* #50ffffff */
+  --tile: rgba(246, 248, 252, .94); /* WHITE_TILE */
+  --tile-night: rgba(223, 228, 234, .85);
+  --ink: #101620;                   /* DARK_INK */
+  --soft: rgba(255, 255, 255, .70); /* #b3ffffff */
+  --track: rgba(255, 255, 255, .27);/* unfocused level #46ffffff */
+}
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--page); color: var(--text); font-family: "Plus Jakarta Sans", system-ui, sans-serif; padding: 32px 16px 64px; }
+header, section { max-width: 1920px; margin: 0 auto; }
+header h1 { font-size: 28px; font-weight: 700; }
+header p { color: var(--muted); margin-top: 6px; font-size: 16px; max-width: 900px; line-height: 1.5; }
+section { margin-top: 40px; }
+
+.tv { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 6px; container-type: inline-size; }
+.tv * { --u: calc(100cqw / 1280); }
+.tv { font-weight: 500; color: #fff; }
+
+/* Fake video stills, letterboxed 2.39:1 as a Netflix film. */
+.video { position: absolute; inset: 0; }
+.video.dark { background:
+  radial-gradient(ellipse 18% 30% at 22% 58%, rgba(255, 150, 60, .55), transparent 70%),
+  radial-gradient(ellipse 8% 12% at 31% 52%, rgba(255, 210, 140, .5), transparent 70%),
+  radial-gradient(ellipse 40% 35% at 72% 38%, rgba(40, 90, 110, .45), transparent 70%),
+  radial-gradient(ellipse 60% 40% at 50% 95%, rgba(20, 30, 45, .9), transparent 70%),
+  linear-gradient(180deg, #05080d 0%, #0c1420 55%, #06080b 100%); }
+.video.bright { background:
+  radial-gradient(circle at 80% 30%, #fffdf6 0 6%, rgba(255, 248, 225, .85) 12%, transparent 35%),
+  linear-gradient(180deg, #8fbbe6 0%, #cfe0ee 38%, #f6e7cc 52%, #e9b77d 56%, #d39457 75%, #b9763f 100%); }
+.bars::before, .bars::after { content: ""; position: absolute; left: 0; right: 0; height: calc(var(--u) * 92); background: #000; }
+.bars::before { top: 0; } .bars::after { bottom: 0; }
+.subtitle { position: absolute; left: 0; right: 0; top: calc(var(--u) * 640); text-align: center; font-size: calc(var(--u) * 26); text-shadow: 0 0 calc(var(--u) * 4) #000; }
+/* Proposed horizontal scrim behind the column (a rotated Rectangle in QML). */
+.scrim { position: absolute; top: 0; bottom: 0; right: 0; width: calc(var(--u) * 560); background: linear-gradient(90deg, transparent, rgba(0, 0, 0, .45)); }
+
+.col { position: absolute; left: calc(var(--u) * 770); top: calc(var(--u) * 92); width: calc(var(--u) * 456); display: flex; flex-direction: column; gap: calc(var(--u) * 10); }
+.row2 { display: flex; gap: calc(var(--u) * 10); }
+
+svg.i { width: calc(var(--u) * 24); height: calc(var(--u) * 24); fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+svg.s { width: calc(var(--u) * 20); height: calc(var(--u) * 20); }
+
+/* "Ahora" card: information only, never focused. */
+.card { height: calc(var(--u) * 112); border-radius: calc(var(--u) * 34); background: var(--glass); border: 1px solid var(--edge); padding: 0 calc(var(--u) * 20); display: flex; flex-direction: column; justify-content: center; gap: calc(var(--u) * 14); }
+.card .line { display: flex; align-items: center; gap: calc(var(--u) * 6); height: calc(var(--u) * 30); }
+.card .line svg { margin-right: calc(var(--u) * 12); }
+.badge { height: calc(var(--u) * 24); padding: 0 calc(var(--u) * 8); border-radius: calc(var(--u) * 6); border: 1.5px solid var(--soft); display: inline-flex; align-items: center; font-weight: 700; font-size: calc(var(--u) * 12); letter-spacing: calc(var(--u) * .6); }
+.badge.prem { background: var(--tile); color: var(--ink); border-color: transparent; }
+.side { margin-left: auto; color: var(--soft); font-size: calc(var(--u) * 15); }
+
+/* Capsules. */
+.pill { position: relative; height: calc(var(--u) * 69); border-radius: calc(var(--u) * 34.5); background: var(--glass); border: 1px solid var(--edge); transition: transform 120ms cubic-bezier(.2, 0, 0, 1); }
+.focus { transform: scale(1.03); box-shadow: 0 0 0 calc(var(--u) * 3) rgba(255, 255, 255, .35); z-index: 1; }
+.labels { position: absolute; top: 0; left: 0; height: 100%; width: calc(var(--u) * 456); display: flex; align-items: center; padding: 0 calc(var(--u) * 20) 0 calc(var(--u) * 22); gap: calc(var(--u) * 14); font-size: calc(var(--u) * 19); }
+.labels .v { margin-left: auto; display: flex; align-items: center; gap: calc(var(--u) * 6); }
+.fill { position: absolute; top: 0; left: 0; height: 100%; width: calc(var(--lvl) * 1%); overflow: hidden; border-radius: calc(var(--u) * 34.5) 0 0 calc(var(--u) * 34.5); }
+.fill .lvl { position: absolute; inset: 0 auto 0 0; width: calc(var(--u) * 456); border-radius: calc(var(--u) * 34.5); background: var(--track); }
+.focus .fill .lvl { background: var(--tile); }
+.focus .fill .labels { color: var(--ink); }
+.night .focus .fill .lvl { background: var(--tile-night); }
+
+/* Half tiles (PanelButton with sublabel/on). */
+.half { flex: 1; display: flex; align-items: center; gap: calc(var(--u) * 10); padding: 0 calc(var(--u) * 14) 0 calc(var(--u) * 12); }
+.disc { width: calc(var(--u) * 44); height: calc(var(--u) * 44); border-radius: 50%; background: rgba(255, 255, 255, .15); display: grid; place-items: center; flex: none; }
+.txt { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.txt b { font-weight: 500; font-size: calc(var(--u) * 17); white-space: nowrap; }
+.txt small { font-size: calc(var(--u) * 15); color: var(--soft); white-space: nowrap; }
+.on .disc { background: var(--tile); color: var(--ink); }
+.tile.focus { background: var(--tile); color: var(--ink); border-color: transparent; }
+.night .tile.focus { background: var(--tile-night); }
+.tile.focus small { color: rgba(16, 22, 32, .72); }
+.tile.focus .disc { background: rgba(16, 22, 32, .10); }
+.tile.focus.on .disc { background: var(--ink); color: #fff; }
+
+/* Picker (new PanelPicker). */
+.picker .labels { width: 100%; }
+.chev { opacity: 1; } .chev.end { opacity: .3; }
+.dots { position: absolute; right: calc(var(--u) * 46); bottom: calc(var(--u) * 9); display: flex; gap: calc(var(--u) * 5); }
+.dots i { width: calc(var(--u) * 5); height: calc(var(--u) * 5); border-radius: 50%; background: currentColor; opacity: .35; }
+.dots i.cur { opacity: 1; width: calc(var(--u) * 12); border-radius: calc(var(--u) * 3); }
+.picker .v { margin-top: calc(var(--u) * -8); }
+.pending { opacity: .6; }
+
+/* Sheet (new PanelSheet). */
+.sheethead { height: calc(var(--u) * 48); display: flex; align-items: center; gap: calc(var(--u) * 10); padding-left: calc(var(--u) * 10); font-weight: 700; font-size: calc(var(--u) * 19); text-shadow: 0 0 calc(var(--u) * 6) rgba(0, 0, 0, .6); }
+.switch { width: calc(var(--u) * 44); height: calc(var(--u) * 26); border-radius: calc(var(--u) * 13); background: var(--tile); position: relative; }
+.switch::after { content: ""; position: absolute; right: calc(var(--u) * 3); top: calc(var(--u) * 3); width: calc(var(--u) * 20); height: calc(var(--u) * 20); border-radius: 50%; background: var(--ink); }
+.note { font-size: calc(var(--u) * 15); color: var(--soft); padding: calc(var(--u) * 4) calc(var(--u) * 20); line-height: 1.4; }
+
+/* Legends. */
+.legend { margin-top: 14px; display: grid; gap: 8px; max-width: 1100px; }
+.legend h2 { font-size: 20px; font-weight: 700; }
+.legend p { color: var(--muted); font-size: 15px; line-height: 1.55; }
+.legend kbd { font-family: inherit; font-size: 13px; padding: 1px 7px; border: 1px solid #3a4250; border-radius: 6px; color: var(--text); background: #161a22; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+  <symbol id="moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+  <symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="vol" viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></symbol>
+  <symbol id="tv" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="m17 2-5 5-5-5"/></symbol>
+  <symbol id="speaker" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><circle cx="12" cy="14" r="4"/><path d="M12 6h.01"/></symbol>
+  <symbol id="screenoff" viewBox="0 0 24 24"><path d="M17 17H4a2 2 0 0 1-2-2V5c0-1.5 1-2 1-2M22 15V5a2 2 0 0 0-2-2H9M8 21h8M12 17v4M2 2l20 20"/></symbol>
+  <symbol id="sliders" viewBox="0 0 24 24"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></symbol>
+  <symbol id="cl" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="cr" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="cal" viewBox="0 0 24 24"><path d="M8 2v4M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/></symbol>
+</svg>
+
+<header>
+  <h1>Panel rápido · LG OLED55C1</h1>
+  <p>Maqueta de la propuesta (<code>docs/design/panel-rapido-lg.md</code>) a 1920×1080. Todas las medidas van en unidades de 1280×720. No hay desenfoque: el vídeo va en un plano de hardware, así que el vidrio es un relleno oscuro al 78 %, con una velada a la derecha.</p>
+</header>
+
+<!-- 1 · Just opened -->
+<section>
+  <div class="tv">
+    <div class="video dark bars"></div>
+    <div class="subtitle">— ¿Has oído eso?</div>
+    <div class="scrim"></div>
+    <div class="col">
+      <div class="card">
+        <div class="line"><svg class="i s"><use href="#tv"/></svg><span class="badge prem">DOLBY VISION</span><span class="badge">4K</span><span class="badge">24p</span></div>
+        <div class="line"><svg class="i s"><use href="#speaker"/></svg><span class="badge">DOLBY DIGITAL PLUS 5.1</span><span class="side">Sonos Arc</span></div>
+      </div>
+      <div class="pill focus" style="--lvl:70">
+        <div class="labels"><svg class="i"><use href="#sun"/></svg>Brillo<span class="v">70 %</span></div>
+        <div class="fill"><div class="lvl"></div><div class="labels"><svg class="i"><use href="#sun"/></svg>Brillo<span class="v">70 %</span></div></div>
+      </div>
+      <div class="row2">
+        <div class="pill tile half"><span class="disc"><svg class="i s"><use href="#moon"/></svg></span><span class="txt"><b>Modo noche</b><small>Desactivado</small></span></div>
+        <div class="pill tile half on"><span class="disc"><svg class="i s"><use href="#clock"/></svg></span><span class="txt"><b>Horario</b><small>22:00–07:00</small></span></div>
+      </div>
+      <div class="pill" style="--lvl:24">
+        <div class="labels"><svg class="i"><use href="#vol"/></svg>Volumen<span class="v">24 %</span></div>
+        <div class="fill"><div class="lvl"></div><div class="labels"><svg class="i"><use href="#vol"/></svg>Volumen<span class="v">24 %</span></div></div>
+      </div>
+      <div class="pill tile picker">
+        <div class="labels"><svg class="i"><use href="#tv"/></svg>Modo de imagen<span class="v"><svg class="i s chev end"><use href="#cl"/></svg>Vívido<svg class="i s chev"><use href="#cr"/></svg></span></div>
+        <div class="dots" aria-label="1 de 6"><i class="cur"></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="row2">
+        <div class="pill tile half"><span class="disc"><svg class="i s"><use href="#screenoff"/></svg></span><span class="txt"><b>Apagar pantalla</b></span></div>
+        <div class="pill tile half"><span class="disc"><svg class="i s"><use href="#sliders"/></svg></span><span class="txt"><b>Más ajustes</b></span></div>
+      </div>
+    </div>
+  </div>
+  <div class="legend">
+    <h2>1 · Recién abierto: el foco está en Brillo</h2>
+    <p>⚙ abre el panel en 240 ms, subiendo 22 u. El foco cae en <b>Brillo</b>, lo más usado de noche: <kbd>←</kbd> <kbd>→</kbd> ±5 y <kbd>OK</kbd> alterna Auto. <kbd>↓</kbd> lleva a <b>Modo noche</b>, pegado al brillo. La tarjeta «Ahora» solo informa y ya no repite el modo de imagen. El horario está activo: su disco va relleno y el texto dice las horas, así que no depende del color. En el borde izquierdo de Modo de imagen, el chevrón se apaga al 30 %.</p>
+  </div>
+</section>
+
+<!-- 2 · Picture mode, bright video -->
+<section>
+  <div class="tv">
+    <div class="video bright bars"></div>
+    <div class="scrim"></div>
+    <div class="col">
+      <div class="card">
+        <div class="line"><svg class="i s"><use href="#tv"/></svg><span class="badge prem">DOLBY VISION</span><span class="badge">4K</span><span class="badge">24p</span></div>
+        <div class="line"><svg class="i s"><use href="#speaker"/></svg><span class="badge prem">DOLBY ATMOS</span><span class="side">Sonos Arc</span></div>
+      </div>
+      <div class="pill" style="--lvl:70">
+        <div class="labels"><svg class="i"><use href="#sun"/></svg>Brillo<span class="v">70 %</span></div>
+        <div class="fill"><div class="lvl"></div><div class="labels"><svg class="i"><use href="#sun"/></svg>Brillo<span class="v">70 %</span></div></div>
+      </div>
+      <div class="row2">
+        <div class="pill tile half"><span class="disc"><svg class="i s"><use href="#moon"/></svg></span><span class="txt"><b>Modo noche</b><small>Desactivado</small></span></div>
+        <div class="pill tile half on"><span class="disc"><svg class="i s"><use href="#clock"/></svg></span><span class="txt"><b>Horario</b><small>22:00–07:00</small></span></div>
+      </div>
+      <div class="pill" style="--lvl:24">
+        <div class="labels"><svg class="i"><use href="#vol"/></svg>Volumen<span class="v">24 %</span></div>
+        <div class="fill"><div class="lvl"></div><div class="labels"><svg class="i"><use href="#vol"/></svg>Volumen<span class="v">24 %</span></div></div>
+      </div>
+      <div class="pill tile picker focus">
+        <div class="labels"><svg class="i"><use href="#tv"/></svg>Modo de imagen<span class="v"><svg class="i s chev"><use href="#cl"/></svg><span>Cine <span class="pending">…</span></span><svg class="i s chev"><use href="#cr"/></svg></span></div>
+        <div class="dots" aria-label="Cine, 4 de 6"><i></i><i></i><i></i><i class="cur"></i><i></i><i></i></div>
+      </div>
+      <div class="row2">
+        <div class="pill tile half"><span class="disc"><svg class="i s"><use href="#screenoff"/></svg></span><span class="txt"><b>Apagar pantalla</b></span></div>
+        <div class="pill tile half"><span class="disc"><svg class="i s"><use href="#sliders"/></svg></span><span class="txt"><b>Más ajustes</b></span></div>
+      </div>
+    </div>
+  </div>
+  <div class="legend">
+    <h2>2 · Foco en Modo de imagen, sobre vídeo claro</h2>
+    <p><kbd>←</kbd> <kbd>→</kbd> cambian de modo dentro de la lista Dolby Vision (6 modos; la posición se ve en los puntos y se dice como «4 de 6»). El nombre cambia al momento, pero el modo <b>se aplica 600 ms después de la última pulsación</b>: hasta entonces se ve «Cine …». Así, pasar por «Vívido» no deslumbra. Al aplicarse, el panel vuelve a leer el brillo de ese modo. <kbd>OK</kbd> abre la hoja con la lista completa (<i>should</i>). La velada y el vidrio al 78 % dejan el texto secundario por encima de 5:1 aunque el sol quede detrás.</p>
+  </div>
+</section>
+
+<!-- 3 · Night mode on -->
+<section>
+  <div class="tv night">
+    <div class="video dark bars" style="filter:brightness(.55)"></div>
+    <div class="subtitle" style="opacity:.8">— Vámonos antes de que vuelvan.</div>
+    <div class="scrim"></div>
+    <div class="col">
+      <div class="card">
+        <div class="line"><svg class="i s"><use href="#tv"/></svg><span class="badge prem">DOLBY VISION</span><span class="badge">4K</span><span class="badge">24p</span></div>
+        <div class="line"><svg class="i s"><use href="#speaker"/></svg><span class="badge">DOLBY DIGITAL PLUS 5.1</span><span class="side">Sonos Arc</span></div>
+      </div>
+      <div class="pill" style="--lvl:40">
+        <div class="labels"><svg class="i"><use href="#sun"/></svg>Brillo<span class="v">Noche · 40 %</span></div>
+        <div class="fill"><div class="lvl"></div><div class="labels"><svg class="i"><use href="#sun"/></svg>Brillo<span class="v">Noche · 40 %</span></div></div>
+      </div>
+      <div class="row2">
+        <div class="pill tile half on focus"><span class="disc"><svg class="i s"><use href="#moon"/></svg></span><span class="txt"><b>Modo noche</b><small>Activado</small></span></div>
+        <div class="pill tile half on"><span class="disc"><svg class="i s"><use href="#clock"/></svg></span><span class="txt"><b>Horario</b><small>22:00–07:00</small></span></div>
+      </div>
+      <div class="pill" style="--lvl:24">
+        <div class="labels"><svg class="i"><use href="#vol"/></svg>Volumen<span class="v">24 %</span></div>
+        <div class="fill"><div class="lvl"></div><div class="labels"><svg class="i"><use href="#vol"/></svg>Volumen<span class="v">24 %</span></div></div>
+      </div>
+      <div class="pill tile picker">
+        <div class="labels"><svg class="i"><use href="#tv"/></svg>Modo de imagen<span class="v"><svg class="i s chev"><use href="#cl"/></svg>Cine<svg class="i s chev"><use href="#cr"/></svg></span></div>
+        <div class="dots" aria-label="Cine, 4 de 6"><i></i><i></i><i></i><i class="cur"></i><i></i><i></i></div>
+      </div>
+      <div class="row2">
+        <div class="pill tile half"><span class="disc"><svg class="i s"><use href="#screenoff"/></svg></span><span class="txt"><b>Apagar pantalla</b></span></div>
+        <div class="pill tile half"><span class="disc"><svg class="i s"><use href="#sliders"/></svg></span><span class="txt"><b>Más ajustes</b></span></div>
+      </div>
+    </div>
+  </div>
+  <div class="legend">
+    <h2>3 · Modo noche activado</h2>
+    <p>Un <kbd>OK</kbd> sobre Modo noche lo activa, sin confirmar. Baja la luz OLED a 40, apaga el pico de brillo y el contraste dinámico, y enciende el confort visual. La barra de Brillo baja en 240 ms y pasa a «Noche · 40 %». Con el foco encima, la cápsula es blanca con el disco en tinta. Sin foco, el disco va relleno de blanco. En los dos casos pone «Activado». En modo noche, la cápsula de foco baja al 85 % para no deslumbrar a oscuras. Otro <kbd>OK</kbd> devuelve los valores guardados. Mover Brillo aquí ajusta y recuerda el nivel de noche.</p>
+  </div>
+</section>
+
+<!-- 4 · Schedule sheet -->
+<section>
+  <div class="tv night">
+    <div class="video dark bars" style="filter:brightness(.55)"></div>
+    <div class="scrim"></div>
+    <div class="col">
+      <div class="sheethead"><svg class="i s"><use href="#cl"/></svg>Horario del modo noche</div>
+      <div class="pill tile half" style="flex:none">
+        <span class="disc"><svg class="i s"><use href="#cal"/></svg></span><span class="txt"><b>Programar</b></span>
+        <span style="margin-left:auto;display:flex;align-items:center;gap:calc(var(--u)*10);font-size:calc(var(--u)*17)">Sí<span class="switch"></span></span>
+      </div>
+      <div class="pill tile picker focus">
+        <div class="labels"><svg class="i"><use href="#moon"/></svg>Empieza<span class="v" style="margin-top:0"><svg class="i s chev"><use href="#cl"/></svg>22:00<svg class="i s chev"><use href="#cr"/></svg></span></div>
+      </div>
+      <div class="pill tile picker">
+        <div class="labels"><svg class="i"><use href="#sun"/></svg>Termina<span class="v" style="margin-top:0"><svg class="i s chev"><use href="#cl"/></svg>07:00<svg class="i s chev"><use href="#cr"/></svg></span></div>
+      </div>
+      <p class="note">Se activa solo cada noche. Si lo quitas a mano, vuelve mañana.</p>
+    </div>
+  </div>
+  <div class="legend">
+    <h2>4 · Hoja «Horario del modo noche» (<i>should</i>)</h2>
+    <p>Se abre con <kbd>OK</kbd> sobre Horario. Entra en la misma columna en 240 ms, desplazándose 40 u. <kbd>↑</kbd> <kbd>↓</kbd> recorren Programar, Empieza y Termina. <kbd>←</kbd> <kbd>→</kbd> cambian la hora de 30 en 30 minutos, y mantener la tecla repite. Es el mismo <code>PanelPicker</code> que el modo de imagen. Los cambios se guardan al momento. <kbd>Atrás</kbd> vuelve al panel con el foco en Horario. Con «Programar: No», las horas se apagan al 40 % y el foco las salta. Como primer paso (<i>must</i>), <kbd>OK</kbd> sobre Horario solo lo activa o desactiva, con 22:00–07:00 por defecto.</p>
+  </div>
+</section>
+
+</body>
+</html>

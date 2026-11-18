@@ -201,7 +201,28 @@ impl Drop for Connection {
     }
 }
 
+thread_local! {
+    /// One bus registration per thread, reused: registering per call cost a round trip to the
+    /// hub each time and froze the loop while the Control Center polled the levels.
+    static CONNECTION: std::cell::RefCell<Option<Connection>> = const { std::cell::RefCell::new(None) };
+}
+
 /// Calls `uri` with the JSON `payload` and returns the raw JSON reply.
 pub fn call(uri: &str, payload: &str, timeout: Duration) -> Result<String, String> {
-    Connection::open()?.request(uri, payload, timeout)
+    CONNECTION.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        if slot.is_none() {
+            *slot = Some(Connection::open()?);
+        }
+        let result = slot.as_mut().map_or_else(
+            || Err("no Luna connection".into()),
+            |c| c.request(uri, payload, timeout),
+        );
+        if result.is_err() {
+            // A timed-out call may still answer later into its reply slot: drop the whole
+            // connection (unregistering it) instead of reusing that slot for the next call.
+            *slot = None;
+        }
+        result
+    })
 }

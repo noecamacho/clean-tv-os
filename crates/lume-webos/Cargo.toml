@@ -1,0 +1,19 @@
+[package]
+name = "lume-webos"
+description = "HOME on rooted LG webOS TVs: SDL2 window, GLES2 renderer, Luna bus bridge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "home"
+path = "src/main.rs"
+
+[dependencies]
+lume-core = { path = "../lume-core" }
+lume-version = { path = "../lume-version" }
+glow = { version = "0.18", default-features = false }
+libc = "0.2"
+log = "0.4"
+png = "0.18"
+serde_json = "1"

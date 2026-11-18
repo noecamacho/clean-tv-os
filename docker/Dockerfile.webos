@@ -1,0 +1,12 @@
+# syntax=docker/dockerfile:1
+#
+# lume-toolchain plus what the webOS (LG TV) build needs: the ARM soft-float Rust target
+# and `file` for the NDK's relocate-sdk.sh. The webOS NDK itself is mounted at build time
+# (scripts/webos-build.sh); it lives outside the repository.
+
+FROM lume-toolchain:latest
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends file \
+    && rm -rf /var/lib/apt/lists/* \
+    && rustup target add --toolchain 1.99.1 armv7-unknown-linux-gnueabi

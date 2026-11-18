@@ -6,6 +6,7 @@ members = [
     "crates/lume-version",
     "crates/lume-core",
     "crates/lume-app",
+    "crates/lume-webos",
     "tools/lume-desktop",
 ]
 

@@ -14,6 +14,7 @@ PAGES = [
     "next-work.md",
     "tvos-hig.md",
     "tcl-apis.md",
+    "lg-webos.md",
 ]
 
 

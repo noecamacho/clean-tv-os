@@ -1,0 +1,207 @@
+//! One bounded Luna (LS2) round trip per call, in-process.
+//!
+//! The jail does not let the app execute `luna-send`, so HOME talks to the hub with
+//! `libluna-service2` directly: register anonymously (the hub authenticates the executable
+//! and its role), send one call, iterate a private GLib context until the reply or the
+//! deadline. Technique after Luma's `src/luna.rs` (ecklf/lg-luma, MIT).
+
+use libc::{c_char, c_int, c_ulong, c_void};
+use std::ffi::{CStr, CString};
+use std::ptr;
+use std::time::{Duration, Instant};
+
+const MAX_REPLY: usize = 2 * 1024 * 1024;
+
+/// Layout from the NDK's public `luna-service2/lunaservice.h`.
+#[repr(C)]
+struct Error {
+    code: c_int,
+    message: *mut c_char,
+    file: *const c_char,
+    line: c_int,
+    function: *const c_char,
+    padding: *mut c_void,
+    magic: c_ulong,
+}
+
+#[link(name = "luna-service2")]
+extern "C" {
+    fn LSErrorInit(error: *mut Error) -> bool;
+    fn LSErrorFree(error: *mut Error);
+    fn LSRegister(name: *const c_char, handle: *mut *mut c_void, error: *mut Error) -> bool;
+    fn LSUnregister(handle: *mut c_void, error: *mut Error) -> bool;
+    fn LSGmainContextAttach(handle: *mut c_void, context: *mut c_void, error: *mut Error) -> bool;
+    fn LSCallOneReply(
+        handle: *mut c_void,
+        uri: *const c_char,
+        payload: *const c_char,
+        callback: extern "C" fn(*mut c_void, *mut c_void, *mut c_void) -> bool,
+        userdata: *mut c_void,
+        token: *mut c_ulong,
+        error: *mut Error,
+    ) -> bool;
+    fn LSCallCancel(handle: *mut c_void, token: c_ulong, error: *mut Error) -> bool;
+    fn LSMessageGetPayload(message: *mut c_void) -> *const c_char;
+}
+
+#[link(name = "glib-2.0")]
+extern "C" {
+    fn g_main_context_new() -> *mut c_void;
+    fn g_main_context_iteration(context: *mut c_void, may_block: c_int) -> c_int;
+    fn g_main_context_unref(context: *mut c_void);
+}
+
+impl Error {
+    fn new() -> Error {
+        // SAFETY: the public error structure is zero-initializable; LSErrorInit sets its cookie.
+        unsafe {
+            let mut error = std::mem::zeroed();
+            LSErrorInit(&mut error);
+            error
+        }
+    }
+
+    fn describe(&self, stage: &str) -> String {
+        let detail = if self.message.is_null() {
+            String::new()
+        } else {
+            // SAFETY: LS2 owns this NUL-terminated string until LSErrorFree.
+            unsafe { CStr::from_ptr(self.message) }
+                .to_string_lossy()
+                .chars()
+                .take(240)
+                .collect()
+        };
+        format!("LS2 {stage} failed ({}): {detail}", self.code)
+    }
+}
+
+impl Drop for Error {
+    fn drop(&mut self) {
+        // SAFETY: every Error was initialized and is freed exactly once.
+        unsafe { LSErrorFree(self) };
+    }
+}
+
+#[derive(Default)]
+struct Reply {
+    payload: Option<Result<String, String>>,
+}
+
+extern "C" fn receive(_handle: *mut c_void, message: *mut c_void, userdata: *mut c_void) -> bool {
+    if message.is_null() || userdata.is_null() {
+        return true;
+    }
+    // SAFETY: LS2 invokes this only while this connection's context is iterated on the calling
+    // thread; the boxed Reply outlives cancellation and unregistration.
+    unsafe {
+        let reply = &mut *userdata.cast::<Reply>();
+        let payload = LSMessageGetPayload(message);
+        reply.payload = Some(if payload.is_null() {
+            Err("Luna reply has no payload".into())
+        } else {
+            let size = libc::strnlen(payload, MAX_REPLY + 1);
+            if size > MAX_REPLY {
+                Err("Luna reply too large".into())
+            } else {
+                let bytes = std::slice::from_raw_parts(payload.cast::<u8>(), size);
+                Ok(String::from_utf8_lossy(bytes).into_owned())
+            }
+        });
+    }
+    true
+}
+
+struct Connection {
+    handle: *mut c_void,
+    context: *mut c_void,
+    reply: Option<Box<Reply>>,
+}
+
+impl Connection {
+    fn open() -> Result<Connection, String> {
+        let mut error = Error::new();
+        let mut connection = Connection {
+            handle: ptr::null_mut(),
+            // SAFETY: GLib returns a new context owned by this connection.
+            context: unsafe { g_main_context_new() },
+            reply: None,
+        };
+        if connection.context.is_null() {
+            return Err("could not allocate a Luna event context".into());
+        }
+        // SAFETY: output and error pointers are valid; a null name registers anonymously.
+        if !unsafe { LSRegister(ptr::null(), &mut connection.handle, &mut error) } {
+            return Err(error.describe("registration"));
+        }
+        // SAFETY: the registered handle and the private context stay alive together.
+        if !unsafe { LSGmainContextAttach(connection.handle, connection.context, &mut error) } {
+            return Err(error.describe("context attachment"));
+        }
+        Ok(connection)
+    }
+
+    fn request(&mut self, uri: &str, payload: &str, timeout: Duration) -> Result<String, String> {
+        let uri = CString::new(uri).map_err(|_| "invalid Luna URI")?;
+        let payload = CString::new(payload).map_err(|_| "invalid Luna payload")?;
+        let mut error = Error::new();
+        let mut reply = Box::<Reply>::default();
+        let userdata = ptr::from_mut(reply.as_mut()).cast();
+        self.reply = Some(reply);
+        let mut token = 0;
+        // SAFETY: the strings and the stable reply allocation outlive this request.
+        if !unsafe {
+            LSCallOneReply(
+                self.handle,
+                uri.as_ptr(),
+                payload.as_ptr(),
+                receive,
+                userdata,
+                &mut token,
+                &mut error,
+            )
+        } {
+            return Err(error.describe("call submission"));
+        }
+        let deadline = Instant::now() + timeout;
+        while Instant::now() < deadline {
+            // SAFETY: only this thread drives this private context; the iteration is nonblocking.
+            unsafe { g_main_context_iteration(self.context, 0) };
+            if let Some(result) = self.reply.as_mut().and_then(|reply| reply.payload.take()) {
+                return result;
+            }
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        let mut cancel_error = Error::new();
+        // SAFETY: handle and token belong to this live request. Even a refused cancel leaves the
+        // callback allocation alive until the connection unregisters on drop.
+        if !unsafe { LSCallCancel(self.handle, token, &mut cancel_error) } {
+            log::warn!("{}", cancel_error.describe("timeout cancellation"));
+        }
+        Err(format!("Luna call timed out ({uri:?})"))
+    }
+}
+
+impl Drop for Connection {
+    fn drop(&mut self) {
+        if !self.handle.is_null() {
+            let mut error = Error::new();
+            // SAFETY: unregister before freeing the context or the callback storage.
+            if !unsafe { LSUnregister(self.handle, &mut error) } {
+                log::warn!("{}", error.describe("unregistration"));
+                // A refused unregister can retain the callback: keep its heap slot alive.
+                std::mem::forget(self.reply.take());
+                return;
+            }
+        }
+        if !self.context.is_null() {
+            // SAFETY: no live LS2 connection can dispatch on this context any more.
+            unsafe { g_main_context_unref(self.context) };
+        }
+    }
+}
+
+/// Calls `uri` with the JSON `payload` and returns the raw JSON reply.
+pub fn call(uri: &str, payload: &str, timeout: Duration) -> Result<String, String> {
+    Connection::open()?.request(uri, payload, timeout)
+}

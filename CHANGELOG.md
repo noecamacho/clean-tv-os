@@ -3,6 +3,18 @@
 Los cambios de HOME, del más reciente al más antiguo. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [Sin publicar]
+
+### Añadido
+
+- **HOME para la LG OLED55C1PSA (webOS 6.5.3, rooteada):** crate `crates/lume-webos` (SDL2 por
+  FFI, GLES2 de `lume-core`, puente al bus Luna), paquete aparte `app.home.tv` 0.1.0,
+  `scripts/webos-build.sh`, `docker/Dockerfile.webos` y el mando virtual `scripts/lg-key.sh`.
+  Corre en la tele con la lista real de apps; faltan fondo, iconos y entradas. El APK de la TCL
+  no cambia.
+- `docs/llm-wiki/lg-webos.md`: root, sustitución del Home, estado del port y diseño híbrido
+  HOME × Luma (Figma, página 06).
+
 ## [0.9.7] - 2026-11-15
 
 ### Corregido

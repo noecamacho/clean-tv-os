@@ -1,0 +1,20 @@
+{
+  "id": "app.home.tv",
+  "version": "0.1.0",
+  "vendor": "HOME",
+  "type": "native",
+  "main": "home",
+  "title": "HOME",
+  "icon": "app-icon.png",
+  "largeIcon": "app-icon-large.png",
+  "appDescription": "Launcher personal con estética tvOS para webOS rooteado",
+  "resolution": "1920x1080",
+  "handlesRelaunch": false,
+  "requiredACG": [
+    "application.launcher",
+    "application.query",
+    "lunabus.query"
+  ],
+  "iconColor": "#101014",
+  "bgColor": "#101014"
+}

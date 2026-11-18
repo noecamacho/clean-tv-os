@@ -12,6 +12,7 @@ Esta wiki es el contexto de trabajo para otros agentes. Se actualizó el 16 de n
 6. [Pendientes y guía de colaboración](next-work.md): riesgos, decisiones abiertas y pruebas futuras.
 7. [Guía de diseño de tvOS (HIG)](tvos-hig.md): lo que Apple publica, diferencias con HOME y lista priorizada de cambios. Estudiada el 2026-11-11; los vídeos solo por transcripción.
 8. [APIs de TCL y Realtek en la 55Q5K](tcl-apis.md): librerías del fabricante que una app puede cargar, sus clases y métodos, y los límites. Úsala antes de dar por imposible un control de la tele.
+9. [HOME en LG webOS](lg-webos.md): segunda tele (OLED55C1PSA, webOS 6.5.3). Límites de una app web, ruta nativa con root, CLI, simulador y lo que falta comprobar. Tele rooteada; port nativo `app.home.tv` en curso (`crates/lume-webos`) y diseño híbrido HOME × Luma en Figma.
 
 ## Fuentes de verdad
 
